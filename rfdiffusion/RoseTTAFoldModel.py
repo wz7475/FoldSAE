@@ -138,3 +138,35 @@ class RoseTTAFoldModule(nn.Module):
         xyz = einsum('rbnij,bnaj->rbnai', R, xyz[:,:,:3]-xyz[:,:,1].unsqueeze(-2)) + T.unsqueeze(-2)
 
         return logits, logits_aa, logits_exp, xyz, alpha_s, lddt
+
+class HookedRoseTTAFoldModule(RoseTTAFoldModule):
+    def _register_cache_hook(self, cache: dict):
+
+        def getActivation(name):
+            def hook(model, input, output):
+                cache[name] = output.detach()
+            return hook
+
+        return self.templ_emb.attn.register_forward_hook(getActivation("temp_attn"))
+
+
+
+    def run_with_cache(self, msa_latent, msa_full, seq, xyz, idx, t,
+                t1d=None, t2d=None, xyz_t=None, alpha_t=None,
+                msa_prev=None, pair_prev=None, state_prev=None,
+                return_raw=False, return_full=False, return_infer=False,
+                use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
+
+        activations_dict = {}
+
+        hook = self._register_cache_hook(activations_dict)
+
+        output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
+                t1d, t2d, xyz_t, alpha_t,
+                msa_prev, pair_prev, state_prev,
+                return_raw, return_full, return_infer,
+                use_checkpoint, motif_mask, i_cycle, n_cycle)
+
+        hook.remove()
+
+        return *output, activations_dict

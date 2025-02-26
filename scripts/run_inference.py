@@ -52,6 +52,7 @@ def main(conf: HydraConfig) -> None:
 
     # Initialize sampler and target/contig.
     sampler = iu.sampler_selector(conf)
+    log.info(f"1111 {sampler.__class__.__name__}")
 
     # Loop over number of designs to sample.
     design_startnum = sampler.inf_conf.design_startnum
@@ -90,14 +91,17 @@ def main(conf: HydraConfig) -> None:
         x_t = torch.clone(x_init)
         seq_t = torch.clone(seq_init)
         # Loop over number of reverse diffusion time steps.
+        activations = {}
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
-            px0, x_t, seq_t, plddt = sampler.sample_step(
+            px0, x_t, seq_t, plddt, activations_t = sampler.sample_step(
                 t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step
             )
             px0_xyz_stack.append(px0)
             denoised_xyz_stack.append(x_t)
             seq_stack.append(seq_t)
             plddt_stack.append(plddt[0])  # remove singleton leading dimension
+            activations[t] = activations_t
+        print(f"ACTIVATIONS: {activations}")
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)

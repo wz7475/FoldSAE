@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
-from rfdiffusion.RoseTTAFoldModel import RoseTTAFoldModule
+from rfdiffusion.RoseTTAFoldModel import RoseTTAFoldModule, HookedRoseTTAFoldModule
 from rfdiffusion.kinematics import get_init_xyz, xyz_to_t2d
 from rfdiffusion.diffusion import Diffuser
 from rfdiffusion.chemical import seq2chars
@@ -223,7 +223,7 @@ class Sampler:
         # Read input dimensions from checkpoint.
         self.d_t1d=self._conf.preprocess.d_t1d
         self.d_t2d=self._conf.preprocess.d_t2d
-        model = RoseTTAFoldModule(**self._conf.model, d_t1d=self.d_t1d, d_t2d=self.d_t2d, T=self._conf.diffuser.T).to(self.device)
+        model = HookedRoseTTAFoldModule(**self._conf.model, d_t1d=self.d_t1d, d_t2d=self.d_t2d, T=self._conf.diffuser.T).to(self.device)
         if self._conf.logging.inputs:
             pickle_dir = pickle_function_call(model, 'forward', 'inference')
             print(f'pickle_dir: {pickle_dir}')
@@ -661,7 +661,7 @@ class SelfConditioning(Sampler):
         ####################
 
         with torch.no_grad():
-            msa_prev, pair_prev, px0, state_prev, alpha, logits, plddt = self.model(msa_masked,
+            msa_prev, pair_prev, px0, state_prev, alpha, logits, plddt, activations = self.model.run_with_cache(msa_masked,
                                 msa_full,
                                 seq_in,
                                 xt_in,
@@ -713,7 +713,7 @@ class SelfConditioning(Sampler):
         if self.symmetry is not None:
             x_t_1, seq_t_1 = self.symmetry.apply_symmetry(x_t_1, seq_t_1)
 
-        return px0, x_t_1, seq_t_1, plddt
+        return px0, x_t_1, seq_t_1, plddt, activations
 
     def symmetrise_prev_pred(self, px0, seq_in, alpha):
         """
