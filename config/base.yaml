@@ -1,5 +1,8 @@
 # Base inference Configuration.
 
+defaults:
+  - activations: empty
+
 inference:
   input_pdb: null
   num_designs: 10
@@ -70,6 +73,7 @@ model:
     num_edge_features: 64
   freeze_track_motif: False
   use_motif_timestep: False
+  activations: ${activations}
 
 diffuser:
   T: 50

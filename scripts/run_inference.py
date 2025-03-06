@@ -35,7 +35,7 @@ def make_deterministic(seed=0):
     random.seed(seed)
 
 
-@hydra.main(version_base=None, config_path="../config/inference", config_name="base")
+@hydra.main(version_base=None, config_path="../config", config_name="base")
 def main(conf: HydraConfig) -> None:
     log = logging.getLogger(__name__)
     if conf.inference.deterministic:
@@ -52,7 +52,6 @@ def main(conf: HydraConfig) -> None:
 
     # Initialize sampler and target/contig.
     sampler = iu.sampler_selector(conf)
-    log.info(f"1111 {sampler.__class__.__name__}")
 
     # Loop over number of designs to sample.
     design_startnum = sampler.inf_conf.design_startnum

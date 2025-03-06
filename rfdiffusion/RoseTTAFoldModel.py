@@ -1,3 +1,5 @@
+from typing import Callable
+
 import torch
 import torch.nn as nn
 from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
@@ -140,18 +142,48 @@ class RoseTTAFoldModule(nn.Module):
         return logits, logits_aa, logits_exp, xyz, alpha_s, lddt
 
 class HookedRoseTTAFoldModule(RoseTTAFoldModule):
-    def _register_cache_hooks(self, cache: dict):
+    def __init__(self,
+                 n_extra_block,
+                 n_main_block,
+                 n_ref_block,
+                 d_msa,
+                 d_msa_full,
+                 d_pair,
+                 d_templ,
+                 n_head_msa,
+                 n_head_pair,
+                 n_head_templ,
+                 d_hidden,
+                 d_hidden_templ,
+                 p_drop,
+                 d_t1d,
+                 d_t2d,
+                 T, # total timesteps (used in timestep emb
+                 use_motif_timestep, # Whether to have a distinct emb for motif
+                 freeze_track_motif, # Whether to freeze updates to motif in track
+                 SE3_param_full={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
+                 SE3_param_topk={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
+                 input_seq_onehot=False,     # For continuous vs. discrete sequence
+                 activations=None
+                 ):
+        super().__init__(n_extra_block, n_main_block, n_ref_block, d_msa, d_msa_full, d_pair, d_templ, n_head_msa,
+                         n_head_pair, n_head_templ, d_hidden, d_hidden_templ, p_drop, d_t1d, d_t2d, T,
+                         use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
+        self.activations_map = activations
 
+    def _register_hook_by_path(self, block_path: str, hook: Callable):
+        module = self
+        for block in block_path.split('.'):
+            module = getattr(module, block)
+        return module.register_forward_hook(hook)
+
+    def _register_cache_hooks(self, cache: dict):
         def getActivation(name):
             def hook(model, input, output):
                 cache[name] = output.detach()
             return hook
 
-        return [
-            self.templ_emb.attn.register_forward_hook(getActivation("temp_attn")),
-            self.templ_emb.attn_tor.register_forward_hook(getActivation("temp_attn_tor")),
-            self.simulator.main_block[0].msa2msa.register_forward_hook(getActivation("msa2msa")),
-        ]
+        return [self._register_hook_by_path(block_path, getActivation(self.activations_map[block_path])) for block_path in self.activations_map]
 
     def _register_ablation_hooks(self):
 
