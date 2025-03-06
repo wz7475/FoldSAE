@@ -140,14 +140,17 @@ class RoseTTAFoldModule(nn.Module):
         return logits, logits_aa, logits_exp, xyz, alpha_s, lddt
 
 class HookedRoseTTAFoldModule(RoseTTAFoldModule):
-    def _register_cache_hook(self, cache: dict):
+    def _register_cache_hooks(self, cache: dict):
 
         def getActivation(name):
             def hook(model, input, output):
                 cache[name] = output.detach()
             return hook
 
-        return self.templ_emb.attn.register_forward_hook(getActivation("temp_attn"))
+        return [
+            self.templ_emb.attn.register_forward_hook(getActivation("temp_attn")),
+            self.templ_emb.attn_tor.register_forward_hook(getActivation("temp_attn_tor")),
+        ]
 
 
 
@@ -159,7 +162,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
         activations_dict = {}
 
-        hook = self._register_cache_hook(activations_dict)
+        hooks = self._register_cache_hooks(activations_dict)
 
         output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
                 t1d, t2d, xyz_t, alpha_t,
@@ -167,6 +170,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 return_raw, return_full, return_infer,
                 use_checkpoint, motif_mask, i_cycle, n_cycle)
 
-        hook.remove()
+        for hook in hooks:
+            hook.remove()
 
         return *output, activations_dict
