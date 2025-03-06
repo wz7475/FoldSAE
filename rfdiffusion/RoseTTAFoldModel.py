@@ -164,12 +164,14 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                  SE3_param_full={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
                  SE3_param_topk={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
                  input_seq_onehot=False,     # For continuous vs. discrete sequence
-                 activations=None
+                 activations=None,
+                 ablations=None,
                  ):
         super().__init__(n_extra_block, n_main_block, n_ref_block, d_msa, d_msa_full, d_pair, d_templ, n_head_msa,
                          n_head_pair, n_head_templ, d_hidden, d_hidden_templ, p_drop, d_t1d, d_t2d, T,
                          use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
         self.activations_map = activations
+        self.blocks_for_ablation = ablations["ablations"]
 
     def _register_hook_by_path(self, block_path: str, hook: Callable):
         module = self
@@ -195,20 +197,21 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 return input[0]
 
         return [
-            self.simulator.main_block[0].msa2msa.register_forward_hook(AblateHook()) # do not update msa, just return input
+            self._register_hook_by_path(block_path, AblateHook()) for block_path in self.blocks_for_ablation
         ]
 
 
 
-    def run_with_cache(self, msa_latent, msa_full, seq, xyz, idx, t,
-                t1d=None, t2d=None, xyz_t=None, alpha_t=None,
-                msa_prev=None, pair_prev=None, state_prev=None,
-                return_raw=False, return_full=False, return_infer=False,
-                use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
+    def run_with_hooks(self, msa_latent, msa_full, seq, xyz, idx, t,
+                       t1d=None, t2d=None, xyz_t=None, alpha_t=None,
+                       msa_prev=None, pair_prev=None, state_prev=None,
+                       return_raw=False, return_full=False, return_infer=False,
+                       use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
 
         activations_dict = {}
 
-        hooks = self._register_cache_hooks(activations_dict)
+        activation_hooks = self._register_cache_hooks(activations_dict)
+        ablation_hooks = self._register_ablation_hooks()
 
         output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
                 t1d, t2d, xyz_t, alpha_t,
@@ -216,27 +219,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 return_raw, return_full, return_infer,
                 use_checkpoint, motif_mask, i_cycle, n_cycle)
 
-        for hook in hooks:
+        for hook in activation_hooks + ablation_hooks:
             hook.remove()
 
         return *output, activations_dict
-
-    def run_with_ablations(self, msa_latent, msa_full, seq, xyz, idx, t,
-                t1d=None, t2d=None, xyz_t=None, alpha_t=None,
-                msa_prev=None, pair_prev=None, state_prev=None,
-                return_raw=False, return_full=False, return_infer=False,
-                use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
-
-
-        hooks = self._register_ablation_hooks()
-
-        output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
-                t1d, t2d, xyz_t, alpha_t,
-                msa_prev, pair_prev, state_prev,
-                return_raw, return_full, return_infer,
-                use_checkpoint, motif_mask, i_cycle, n_cycle)
-
-        for hook in hooks:
-            hook.remove()
-
-        return *output, {}
