@@ -661,7 +661,7 @@ class SelfConditioning(Sampler):
         ####################
 
         with torch.no_grad():
-            msa_prev, pair_prev, px0, state_prev, alpha, logits, plddt, activations = self.model.run_with_cache(msa_masked,
+            msa_prev, pair_prev, px0, state_prev, alpha, logits, plddt, activations = self.model.run_with_ablations(msa_masked,
                                 msa_full,
                                 seq_in,
                                 xt_in,

@@ -150,6 +150,20 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         return [
             self.templ_emb.attn.register_forward_hook(getActivation("temp_attn")),
             self.templ_emb.attn_tor.register_forward_hook(getActivation("temp_attn_tor")),
+            self.simulator.main_block[0].msa2msa.register_forward_hook(getActivation("msa2msa")),
+        ]
+
+    def _register_ablation_hooks(self):
+
+        class AblateHook:
+            @torch.no_grad()
+            def __call__(self, module, input, output):
+                # if isinstance(input, tuple):
+                #     return (input[0],)
+                return input[0]
+
+        return [
+            self.simulator.main_block[0].msa2msa.register_forward_hook(AblateHook()) # do not update msa, just return input
         ]
 
 
@@ -174,3 +188,23 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             hook.remove()
 
         return *output, activations_dict
+
+    def run_with_ablations(self, msa_latent, msa_full, seq, xyz, idx, t,
+                t1d=None, t2d=None, xyz_t=None, alpha_t=None,
+                msa_prev=None, pair_prev=None, state_prev=None,
+                return_raw=False, return_full=False, return_infer=False,
+                use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
+
+
+        hooks = self._register_ablation_hooks()
+
+        output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
+                t1d, t2d, xyz_t, alpha_t,
+                msa_prev, pair_prev, state_prev,
+                return_raw, return_full, return_infer,
+                use_checkpoint, motif_mask, i_cycle, n_cycle)
+
+        for hook in hooks:
+            hook.remove()
+
+        return *output, {}
