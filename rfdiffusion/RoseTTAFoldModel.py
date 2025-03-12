@@ -166,12 +166,27 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                  input_seq_onehot=False,     # For continuous vs. discrete sequence
                  activations=None,
                  ablations=None,
+                 skipped_main_block=-1,
+                 skipped_extra_block=-1,
                  ):
         super().__init__(n_extra_block, n_main_block, n_ref_block, d_msa, d_msa_full, d_pair, d_templ, n_head_msa,
                          n_head_pair, n_head_templ, d_hidden, d_hidden_templ, p_drop, d_t1d, d_t2d, T,
                          use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
         self.activations_map = activations
         self.blocks_for_ablation = ablations["ablations"]
+        self.simulator = IterativeSimulator(n_extra_block=n_extra_block,
+                                            n_main_block=n_main_block,
+                                            n_ref_block=n_ref_block,
+                                            d_msa=d_msa, d_msa_full=d_msa_full,
+                                            d_pair=d_pair, d_hidden=d_hidden,
+                                            n_head_msa=n_head_msa,
+                                            n_head_pair=n_head_pair,
+                                            SE3_param_full=SE3_param_full,
+                                            SE3_param_topk=SE3_param_topk,
+                                            p_drop=p_drop,
+                                            skipped_main_block=skipped_main_block,
+                                            skipped_extra_block=skipped_extra_block,
+                                            )
 
     def _register_hook_by_path(self, block_path: str, hook: Callable):
         module = self
@@ -194,6 +209,11 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             def __call__(self, module, input, output):
                 # if isinstance(input, tuple):
                 #     return (input[0],)
+                print(f"ablation of block {module.__class__.__name__} ######")
+                try:
+                    print(f"input {input.shape}")
+                except AttributeError:
+                    print(f"input {input[0].shape}")
                 return input[0]
 
         return [

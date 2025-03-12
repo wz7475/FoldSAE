@@ -339,12 +339,14 @@ class IterativeSimulator(nn.Module):
                  n_head_msa=8, n_head_pair=4,
                  SE3_param_full={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
                  SE3_param_topk={'l0_in_features':32, 'l0_out_features':16, 'num_edge_features':32},
-                 p_drop=0.15):
+                 p_drop=0.15, skipped_main_block=-1, skipped_extra_block=-1):
         super(IterativeSimulator, self).__init__()
         self.n_extra_block = n_extra_block
         self.n_main_block = n_main_block
         self.n_ref_block = n_ref_block
-        
+        self.skipped_main_block = skipped_main_block
+        self.skipped_extra_block = skipped_extra_block
+
         self.proj_state = nn.Linear(SE3_param_topk['l0_out_features'], SE3_param_full['l0_out_features'])
         # Update with extra sequences
         if n_extra_block > 0:
@@ -417,15 +419,20 @@ class IterativeSimulator(nn.Module):
             # Get current BB structure
             xyz = einsum('bnij,bnaj->bnai', R_in, xyz_in) + T_in.unsqueeze(-2)
 
-            msa_full, pair, R_in, T_in, state, alpha = self.extra_block[i_m](msa_full, 
-                                                                             pair,
-                                                                             R_in, 
-                                                                             T_in, 
-                                                                             xyz, 
-                                                                             state, 
-                                                                             idx,
-                                                                             motif_mask=motif_mask,
-                                                                             use_checkpoint=use_checkpoint)
+            if i_m != self.skipped_extra_block:
+                msa_full, pair, R_in, T_in, state, alpha = self.extra_block[i_m](msa_full,
+                                                                                 pair,
+                                                                                 R_in,
+                                                                                 T_in,
+                                                                                 xyz,
+                                                                                 state,
+                                                                                 idx,
+                                                                                 motif_mask=motif_mask,
+                                                                                 use_checkpoint=use_checkpoint)
+                last_msa, last_pair, last_R_in, last_T_in, last_state, last_alpha = msa, pair, R_in, T_in, state, alpha
+            else:
+                msa, pair, R_in, T_in, state, alpha = last_msa, last_pair, last_R_in, last_T_in, last_state, last_alpha
+                print(f"SKIPPING ITER EXTRA BLOCK no {i_m}")
             R_s.append(R_in)
             T_s.append(T_in)
             alpha_s.append(alpha)
@@ -435,20 +442,25 @@ class IterativeSimulator(nn.Module):
             T_in = T_in.detach()
             # Get current BB structure
             xyz = einsum('bnij,bnaj->bnai', R_in, xyz_in) + T_in.unsqueeze(-2)
-            
-            msa, pair, R_in, T_in, state, alpha = self.main_block[i_m](msa, 
-                                                                       pair,
-                                                                       R_in, 
-                                                                       T_in, 
-                                                                       xyz, 
-                                                                       state, 
-                                                                       idx,
-                                                                       motif_mask=motif_mask,
-                                                                       use_checkpoint=use_checkpoint)
+
+            if i_m != self.skipped_main_block:
+                msa, pair, R_in, T_in, state, alpha = self.main_block[i_m](msa,
+                                                                           pair,
+                                                                           R_in,
+                                                                           T_in,
+                                                                           xyz,
+                                                                           state,
+                                                                           idx,
+                                                                           motif_mask=motif_mask,
+                                                                           use_checkpoint=use_checkpoint)
+                last_msa, last_pair, last_R_in, last_T_in, last_state, last_alpha = msa, pair, R_in, T_in, state, alpha
+            else:
+                msa, pair, R_in, T_in, state, alpha = last_msa, last_pair, last_R_in, last_T_in, last_state, last_alpha
+                print(f"SKIPPING ITER MAIN BLOCK no {i_m}")
             R_s.append(R_in)
             T_s.append(T_in)
             alpha_s.append(alpha)
-       
+
         state = self.proj_state2(state)
         for i_m in range(self.n_ref_block):
             R_in = R_in.detach()

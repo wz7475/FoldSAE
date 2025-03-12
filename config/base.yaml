@@ -76,6 +76,8 @@ model:
   use_motif_timestep: False
   activations: ${activations}
   ablations: ${ablations}
+  skipped_main_block: -1
+  skipped_extra_block: -1
 
 diffuser:
   T: 50

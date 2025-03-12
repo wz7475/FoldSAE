@@ -1,1 +1,5 @@
-ablations: [simulator.main_block.0.msa2msa, simulator.main_block.1.msa2msa]
+ablations: [
+  simulator.main_block.0.msa2msa,
+  simulator.main_block.1.msa2msa,
+  templ_emb.attn
+]
