@@ -1,0 +1,6 @@
+[submodule "RFDiffSAE"]
+	path = RFDiffSAE
+	url = git@github.com:wz7475/RFDiffSAE.git
+[submodule "protein-struct-pipe"]
+	path = protein-struct-pipe
+	url = git@github.com:wz7475/protein-struct-pipe.git
