@@ -4,3 +4,6 @@
 [submodule "protein-struct-pipe"]
 	path = protein-struct-pipe
 	url = git@github.com:wz7475/protein-struct-pipe.git
+[submodule "CLEAN"]
+	path = CLEAN
+	url = git@github.com:tttianhao/CLEAN.git
