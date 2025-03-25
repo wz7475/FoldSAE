@@ -11,4 +11,4 @@ pip install -e .
 
 
 pip install hydra-core pyrsistent
-pip install pandasgit
+pip install pandas
