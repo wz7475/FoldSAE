@@ -24,7 +24,7 @@ def parse_directory(path: str, fasta_ext) -> Tuple[int, list[float]]:
             i=TEMP_FASTA_NAME,
             o=TEMP_CDHIT_FASTA_NAME,
             c=thr,
-            n=3,
+            n=2,
             d=0,
             sc=1,
         )
@@ -62,4 +62,9 @@ if __name__ == "__main__":
     plt.legend(loc='lower left')
     plt.subplots_adjust(left=0.05, right=0.98)
     plt.ylabel("diversity rate")
-    plt.savefig("membrane.png")
+
+    out_path = args.output
+    dir_name = os.path.dirname(out_path)
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    plt.savefig(out_path)
