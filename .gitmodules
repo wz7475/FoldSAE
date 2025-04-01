@@ -6,4 +6,4 @@
 	url = git@github.com:wz7475/protein-struct-pipe.git
 [submodule "CLEAN"]
 	path = CLEAN
-	url = git@github.com:tttianhao/CLEAN.git
+	url = git@github.com:wz7475/CLEAN.git
