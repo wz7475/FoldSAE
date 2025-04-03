@@ -92,15 +92,22 @@ def main(conf: HydraConfig) -> None:
         # Loop over number of reverse diffusion time steps.
         activations = {}
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
-            px0, x_t, seq_t, plddt, activations_t = sampler.sample_step(
+            px0, x_t, seq_t, plddt, activations_dict = sampler.sample_step(
                 t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step
             )
             px0_xyz_stack.append(px0)
             denoised_xyz_stack.append(x_t)
             seq_stack.append(seq_t)
             plddt_stack.append(plddt[0])  # remove singleton leading dimension
-            activations[t] = activations_t
-        print(f"ACTIVATIONS: {activations}")
+            if t % 1 == 0: # TODO change to every n-th step from config
+                for key in activations_dict:
+                    if activations.get(key):
+                        activations[key] += activations_dict[key]
+                    else:
+                        activations[key] = activations_dict[key]
+        # TODO: merge list per timestep, save every n-th timestep
+        for key in activations:
+            print(f"ACTIVATIONS {key}: {len(activations[key])}, {activations[key][0].shape}")
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)

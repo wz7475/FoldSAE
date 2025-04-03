@@ -6,6 +6,7 @@ from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
 from rfdiffusion.Track_module import IterativeSimulator
 from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
 from opt_einsum import contract as einsum
+from rfdiffusion.activations import ActivationStore
 
 class RoseTTAFoldModule(nn.Module):
     def __init__(self, 
@@ -187,6 +188,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                                             skipped_main_block=skipped_main_block,
                                             skipped_extra_block=skipped_extra_block,
                                             )
+        self.activations_store = ActivationStore()
 
     def _register_hook_by_path(self, block_path: str, hook: Callable):
         module = self
@@ -197,7 +199,25 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
     def _register_cache_hooks(self, cache: dict):
         def getActivation(name):
             def hook(model, input, output):
-                cache[name] = output.detach()
+                if isinstance(output, tuple):
+                    """
+                    output of main block - tuple of 6 tensors
+                    torch.Size([1, 1, 152, 256])
+                    torch.Size([1, 152, 152, 128])
+                    torch.Size([1, 152, 3, 3])
+                    torch.Size([1, 152, 3])
+                    torch.Size([1, 152, 8])
+                    torch.Size([1, 152, 10, 2])
+                    152 is random sequence length
+                    """
+                    seq_len = output[0].shape[2]
+                    buffer = [ output[x].detach().cpu().reshape(seq_len, -1).unbind(0) for x in [0, 2, 3, 4, 5]]
+                    cache[f"{name}_non_pair"] = []
+                    for a, b, c, d, e in zip(*buffer):
+                        cache[f"{name}_non_pair"].append(torch.cat((a, b, c, d, e)))
+                    cache[f"{name}_pair"] = list(output[1].detach().cpu().reshape(output[1].shape[1] * output[1].shape[2], -1).unbind(0))
+                else:
+                    cache[name] = output.detach().cpu()
             return hook
 
         return [self._register_hook_by_path(block_path, getActivation(self.activations_map[block_path])) for block_path in self.activations_map]
