@@ -68,6 +68,7 @@ def main(conf: HydraConfig) -> None:
             indices.append(int(m))
         design_startnum = max(indices) + 1
 
+    all_activations = {}
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.deterministic:
             make_deterministic(i_des)
@@ -90,7 +91,7 @@ def main(conf: HydraConfig) -> None:
         x_t = torch.clone(x_init)
         seq_t = torch.clone(seq_init)
         # Loop over number of reverse diffusion time steps.
-        activations = {}
+        activations_per_design = {}
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
             px0, x_t, seq_t, plddt, activations_dict = sampler.sample_step(
                 t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step
@@ -99,15 +100,18 @@ def main(conf: HydraConfig) -> None:
             denoised_xyz_stack.append(x_t)
             seq_stack.append(seq_t)
             plddt_stack.append(plddt[0])  # remove singleton leading dimension
-            if t % 1 == 0: # TODO change to every n-th step from config
-                for key in activations_dict:
-                    if activations.get(key):
-                        activations[key] += activations_dict[key]
-                    else:
-                        activations[key] = activations_dict[key]
-        # TODO: merge list per timestep, save every n-th timestep
-        for key in activations:
-            print(f"ACTIVATIONS {key}: {len(activations[key])}, {activations[key][0].shape}")
+            # if t % 1 == 0: # change to every n-th step from config
+            for key in activations_dict:
+                if activations_per_design.get(key):
+                    activations_per_design[key] += activations_dict[key]
+                else:
+                    activations_per_design[key] = activations_dict[key]
+        for key in activations_per_design:
+            if all_activations.get(key):
+                all_activations[key] += activations_per_design[key]
+            else:
+                all_activations[key] = activations_per_design[key]
+
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
@@ -171,7 +175,7 @@ def main(conf: HydraConfig) -> None:
         if sampler.inf_conf.write_trajectory:
             # trajectory pdbs
             traj_prefix = (
-                os.path.dirname(out_prefix) + "/traj/" + os.path.basename(out_prefix)
+                    os.path.dirname(out_prefix) + "/traj/" + os.path.basename(out_prefix)
             )
             os.makedirs(os.path.dirname(traj_prefix), exist_ok=True)
 
@@ -198,7 +202,8 @@ def main(conf: HydraConfig) -> None:
             )
 
         log.info(f"Finished design in {(time.time()-start_time)/60:.2f} minutes")
-
+    for key in all_activations:
+        print(f"ACTIVATIONS {key}: {len(all_activations[key])}, {all_activations[key][0].shape}")
 
 if __name__ == "__main__":
     main()
