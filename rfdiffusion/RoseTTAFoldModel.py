@@ -6,7 +6,6 @@ from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
 from rfdiffusion.Track_module import IterativeSimulator
 from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
 from opt_einsum import contract as einsum
-from rfdiffusion.activations import ActivationStore
 
 class RoseTTAFoldModule(nn.Module):
     def __init__(self, 
@@ -188,7 +187,6 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                                             skipped_main_block=skipped_main_block,
                                             skipped_extra_block=skipped_extra_block,
                                             )
-        self.activations_store = ActivationStore()
 
     def _register_hook_by_path(self, block_path: str, hook: Callable):
         module = self

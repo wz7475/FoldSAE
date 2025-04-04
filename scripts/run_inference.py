@@ -21,6 +21,8 @@ import torch
 from omegaconf import OmegaConf
 import hydra
 import logging
+
+from rfdiffusion.activations import save_activations_incrementally, merge_datasets
 from rfdiffusion.util import writepdb_multi, writepdb
 from rfdiffusion.inference import utils as iu
 from hydra.core.hydra_config import HydraConfig
@@ -68,7 +70,7 @@ def main(conf: HydraConfig) -> None:
             indices.append(int(m))
         design_startnum = max(indices) + 1
 
-    all_activations = {}
+    all_dataset_paths = []
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.deterministic:
             make_deterministic(i_des)
@@ -106,12 +108,8 @@ def main(conf: HydraConfig) -> None:
                     activations_per_design[key] += activations_dict[key]
                 else:
                     activations_per_design[key] = activations_dict[key]
-        for key in activations_per_design:
-            if all_activations.get(key):
-                all_activations[key] += activations_per_design[key]
-            else:
-                all_activations[key] = activations_per_design[key]
-
+        dataset_path = save_activations_incrementally(activations_per_design, i_des)
+        all_dataset_paths.append(dataset_path)
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
@@ -202,8 +200,8 @@ def main(conf: HydraConfig) -> None:
             )
 
         log.info(f"Finished design in {(time.time()-start_time)/60:.2f} minutes")
-    for key in all_activations:
-        print(f"ACTIVATIONS {key}: {len(all_activations[key])}, {all_activations[key][0].shape}")
+    merge_datasets(all_dataset_paths)
+
 
 if __name__ == "__main__":
     main()

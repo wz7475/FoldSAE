@@ -1,47 +1,60 @@
-import torch
-import h5py
-import numpy as np
 import os
 
-class ActivationStore:
-    pass
+from datasets import Dataset, DatasetDict, load_from_disk, concatenate_datasets
 
-class ActivationStore2:
-    def __init__(self, root_dir='./activations', compression='gzip', chunk_size=1000):
-        self.root_dir = root_dir
-        self.compression = compression
-        self.chunk_size = chunk_size
-        os.makedirs(root_dir, exist_ok=True)
-        self.current_file = None
-        self.call_count = 0
-        
-    def store_activations(self, cache, iteration):
-        """Store the current activation cache to disk"""
-        if self.current_file is None or self.call_count % self.chunk_size == 0:
-            # Create a new file for every chunk_size iterations
-            if self.current_file is not None:
-                self.current_file.close()
-            file_path = os.path.join(self.root_dir, f'activations_{self.call_count//self.chunk_size}.h5')
-            self.current_file = h5py.File(file_path, 'w')
-            
-        # Store the activations for this iteration
-        grp = self.current_file.create_group(f'iter_{iteration}')
-        for name, tensor in cache.items():
-            # Convert to numpy and store with compression
-            if tensor.is_sparse:
-                # Handle sparse tensors specially
-                indices = tensor._indices().numpy()
-                values = tensor._values().numpy()
-                shape = tensor.shape
-                grp.create_dataset(f'{name}_indices', data=indices, compression=self.compression)
-                grp.create_dataset(f'{name}_values', data=values, compression=self.compression)
-                grp.create_dataset(f'{name}_shape', data=np.array(shape))
+
+def save_activations_incrementally(activations_per_design, design_num, output_dir="activation_datasets"):
+    """Save activations for a single design incrementally."""
+    os.makedirs(output_dir, exist_ok=True)
+
+    processed_dict = {}
+    for key in activations_per_design:
+        processed_dict[key] = [tensor.tolist() for tensor in activations_per_design[key]]
+
+    design_datasets = {}
+    for key in processed_dict:
+        design_datasets[key] = Dataset.from_dict({
+            "design_id": [design_num] * len(processed_dict[key]),
+            "values": processed_dict[key]
+        })
+
+    design_dataset = DatasetDict(design_datasets)
+
+    dataset_path = os.path.join(output_dir, f"design_{design_num}")
+    design_dataset.save_to_disk(dataset_path)
+
+    print(f"Saved activations for design {design_num}")
+    return dataset_path
+
+
+def merge_datasets(dataset_paths, output_path="merged_activation_dataset"):
+    """Merge multiple datasets into one.
+    DatasetDict({
+        block4_non_pair: Dataset({
+            features: ['design_id', 'values'],
+            num_rows: 1243
+        })
+        block4_pair: Dataset({
+            features: ['design_id', 'values'],
+            num_rows: 140459
+        })
+    })
+    dataset["block4_pair"]["values"].shape
+    > torch.Size([140459, 128])
+    train_dataset["block4_non_pair"]["values"].shape
+    > torch.Size([1243, 296])
+    """
+    merged_dict = {}
+
+    for path in dataset_paths:
+        dataset = load_from_disk(path)
+        for key in dataset:
+            if key not in merged_dict:
+                merged_dict[key] = dataset[key]
             else:
-                # Convert dense tensor to numpy and store
-                grp.create_dataset(name, data=tensor.cpu().numpy(), compression=self.compression)
-        
-        self.call_count += 1
-        
-    def close(self):
-        if self.current_file is not None:
-            self.current_file.close()
+                merged_dict[key] = concatenate_datasets([merged_dict[key], dataset[key]])
+
+    merged_dataset = DatasetDict(merged_dict)
+    merged_dataset.save_to_disk(output_path)
+    print(f"Saved merged dataset to {output_path}")
+    return merged_dataset
