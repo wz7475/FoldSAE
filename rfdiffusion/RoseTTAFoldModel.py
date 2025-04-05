@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
@@ -199,28 +199,37 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             module = getattr(module, block)
         return module.register_forward_hook(hook)
 
+    @staticmethod
+    def _transform_iter_block_output(output: IterBlockOutput) -> Tuple[list[torch.Tensor], list[torch.Tensor]]:
+        """
+        output of main block - tuple of 6 tensors
+        torch.Size([1, 1, seq_len, 256])
+        torch.Size([1, seq_len, seq_len, 128])
+        torch.Size([1, seq_len, 3, 3])
+        torch.Size([1, seq_len, 3])
+        torch.Size([1, seq_len, 8])
+        torch.Size([1, seq_len, 10, 2])
+        into ->
+        - list of tensor of size 128 (flatten on idx 1)
+        - list of tensor of size 296 (flatten other: 296 = 256 + 128 + 9 + 3 + 20)
+        """
+        seq_len = output[0].shape[2]
+        buffer = [output[x].detach().cpu().reshape(seq_len, -1).unbind(0) for x in [0, 2, 3, 4, 5]]
+        non_pair = []
+        for a, b, c, d, e in zip(*buffer):
+            non_pair.append(torch.cat((a, b, c, d, e)))
+        pair = list(output[1].detach().cpu().reshape(output[1].shape[1] * output[1].shape[2], -1).unbind(0))
+        return pair, non_pair
+
     def _register_cache_hooks(self, cache: dict):
         def getActivation(name):
-            def hook(model, input, output: IterBlockOutput):
-                if isinstance(output, tuple):
-                    """
-                    output of main block - tuple of 6 tensors
-                    torch.Size([1, 1, 152, 256])
-                    torch.Size([1, 152, 152, 128])
-                    torch.Size([1, 152, 3, 3])
-                    torch.Size([1, 152, 3])
-                    torch.Size([1, 152, 8])
-                    torch.Size([1, 152, 10, 2])
-                    152 is random sequence length
-                    """
-                    seq_len = output[0].shape[2]
-                    buffer = [ output[x].detach().cpu().reshape(seq_len, -1).unbind(0) for x in [0, 2, 3, 4, 5]]
-                    cache[f"{name}_non_pair"] = []
-                    for a, b, c, d, e in zip(*buffer):
-                        cache[f"{name}_non_pair"].append(torch.cat((a, b, c, d, e)))
-                    cache[f"{name}_pair"] = list(output[1].detach().cpu().reshape(output[1].shape[1] * output[1].shape[2], -1).unbind(0))
-                else:
+            def hook(model, input, output):
+                if isinstance(output, IterBlockOutput):
+                    cache[f"{name}_pair"], cache[f"{name}_non_pair"] = self._transform_iter_block_output(output)
+                elif isinstance(output, torch.Tensor):
                     cache[name] = output.detach().cpu()
+                else:
+                    raise ValueError("Only IterBlockOutput tuple and Tensor supported")
             return hook
 
         return [self._register_hook_by_path(block_path, getActivation(self.activations_map[block_path])) for block_path in self.activations_map]

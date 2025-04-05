@@ -351,7 +351,7 @@ class IterBlock(nn.Module):
                                SE3_param=SE3_param,
                                p_drop=p_drop)
 
-    def forward(self, msa, pair, R_in, T_in, xyz, state, idx, motif_mask, use_checkpoint=False):
+    def forward(self, msa, pair, R_in, T_in, xyz, state, idx, motif_mask, use_checkpoint=False) -> IterBlockOutput:
         rbf_feat = rbf(torch.cdist(xyz[:,:,1,:], xyz[:,:,1,:]))
         if use_checkpoint:
             msa = checkpoint.checkpoint(create_custom_forward(self.msa2msa), msa, pair, rbf_feat, state)
@@ -364,7 +364,7 @@ class IterBlock(nn.Module):
             pair = self.pair2pair(pair, rbf_feat)
             R, T, state, alpha = self.str2str(msa, pair, R_in, T_in, xyz, state, idx, motif_mask=motif_mask, top_k=0) 
         
-        return msa, pair, R, T, state, alpha
+        return IterBlockOutput(msa, pair, R, T, state, alpha)
 
 
 class IterativeSimulator(nn.Module):
