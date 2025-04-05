@@ -27,7 +27,7 @@ def save_activations_incrementally(activations_per_design, design_num, output_di
     dataset_path = os.path.join(output_dir, f"design_{design_num}_{uuid4()}")
     design_dataset.save_to_disk(dataset_path)
 
-    print(f"Saved activations for design {design_num}")
+    print(f"Saved activations {dataset_path}")
     return dataset_path
 
 

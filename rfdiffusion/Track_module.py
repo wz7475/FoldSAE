@@ -1,4 +1,7 @@
+from typing import NamedTuple
+
 import torch.utils.checkpoint as checkpoint
+
 from rfdiffusion.util_module import *
 from rfdiffusion.Attention_module import *
 from rfdiffusion.SE3_network import SE3TransformerWrapper
@@ -293,6 +296,36 @@ class Str2Str(nn.Module):
         alpha = self.sc_predictor(msa[:,0], state)
         return Ri, Ti, state, alpha
 
+
+class IterBlockOutput(NamedTuple):
+    """
+    torch.Size([1, 1, seq_length, 256])
+    torch.Size([1, seq_length, seq_length, 128])
+    torch.Size([1, seq_length, 3, 3])
+    torch.Size([1, seq_length, 3])
+    torch.Size([1, seq_length, 8])
+    torch.Size([1, seq_length, 10, 2])
+    """
+
+    msa: torch.Tensor
+    """Embedding for multiple sequence alignment (MSA)."""
+
+    pair: torch.Tensor
+    """Embedding for amino acid pairs."""
+
+    R_in: torch.Tensor
+    """Transformation matrices for rotation/translation of coordinates."""
+
+    T_in: torch.Tensor
+    """Transformation matrices for rotation/translation of coordinates."""
+
+    state: torch.Tensor
+    """State, possibly used to convey information about the advanced level of generation."""
+
+    alpha: torch.Tensor
+    """Angles (torsion), likely more local features of the structure, whereas xyz are global."""
+
+
 class IterBlock(nn.Module):
     def __init__(self, d_msa=256, d_pair=128,
                  n_head_msa=8, n_head_pair=4,
@@ -332,6 +365,7 @@ class IterBlock(nn.Module):
             R, T, state, alpha = self.str2str(msa, pair, R_in, T_in, xyz, state, idx, motif_mask=motif_mask, top_k=0) 
         
         return msa, pair, R, T, state, alpha
+
 
 class IterativeSimulator(nn.Module):
     def __init__(self, n_extra_block=4, n_main_block=12, n_ref_block=4,

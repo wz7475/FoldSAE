@@ -3,9 +3,12 @@ from typing import Callable
 import torch
 import torch.nn as nn
 from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
-from rfdiffusion.Track_module import IterativeSimulator
+from rfdiffusion.Track_module import IterativeSimulator, IterBlockOutput
 from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
 from opt_einsum import contract as einsum
+
+from rfdiffusion.sae.sae import SAE
+
 
 class RoseTTAFoldModule(nn.Module):
     def __init__(self, 
@@ -173,7 +176,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         super().__init__(n_extra_block, n_main_block, n_ref_block, d_msa, d_msa_full, d_pair, d_templ, n_head_msa,
                          n_head_pair, n_head_templ, d_hidden, d_hidden_templ, p_drop, d_t1d, d_t2d, T,
                          use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
-        self.activations_map = activations
+        self.activations_map = activations["map"]
         self.blocks_for_ablation = ablations["ablations"]
         self.sae_interventions = sae_interventions
         self.simulator = IterativeSimulator(n_extra_block=n_extra_block,
@@ -198,7 +201,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
     def _register_cache_hooks(self, cache: dict):
         def getActivation(name):
-            def hook(model, input, output):
+            def hook(model, input, output: IterBlockOutput):
                 if isinstance(output, tuple):
                     """
                     output of main block - tuple of 6 tensors
@@ -241,12 +244,18 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
     def _register_sae_intervention_hooks(self):
 
         class SAEInterventionHook:
+            def __init__(self, sae_for_pair: SAE, sae_for_non_pair: SAE):
+                self.sae_for_pair = sae_for_pair
+                self.sae_for_non_pair = sae_for_non_pair
+                self.sae_for_pair.eval()
+                self.sae_for_non_pair.eval()
+
             @torch.no_grad()
             def __call__(self, module, input, output):
                 print(module.__class__.__name__)
                 return output
 
-        return [self._register_hook_by_path(block_path, SAEInterventionHook()) for block_path in self.sae_interventions["blocks"]]
+        return [self._register_hook_by_path(block_path, SAEInterventionHook(SAE(128, 128*3), SAE(296, 296*3))) for block_path in self.sae_interventions["blocks"]]
 
 
     def run_with_hooks(self, msa_latent, msa_full, seq, xyz, idx, t,

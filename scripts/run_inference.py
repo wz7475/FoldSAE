@@ -72,7 +72,6 @@ def main(conf: HydraConfig) -> None:
             indices.append(int(m))
         design_startnum = max(indices) + 1
 
-    all_dataset_paths = []
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.deterministic:
             make_deterministic(i_des)
@@ -112,8 +111,7 @@ def main(conf: HydraConfig) -> None:
                     activations_per_design[key] += activations_dict[key]
                 else:
                     activations_per_design[key] = activations_dict[key]
-        dataset_path = save_activations_incrementally(activations_per_design, i_des)
-        all_dataset_paths.append(dataset_path)
+        save_activations_incrementally(activations_per_design, i_des, conf.activations.dataset_path)
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
