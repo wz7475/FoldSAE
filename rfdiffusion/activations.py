@@ -1,10 +1,14 @@
 import os
 
 from datasets import Dataset, DatasetDict, load_from_disk, concatenate_datasets
+from uuid import uuid4
 
 
 def save_activations_incrementally(activations_per_design, design_num, output_dir="activation_datasets"):
-    """Save activations for a single design incrementally."""
+    """
+    Save activations for a single design incrementally. Adds random identifier not to other write design with same
+    index.
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     processed_dict = {}
@@ -20,7 +24,7 @@ def save_activations_incrementally(activations_per_design, design_num, output_di
 
     design_dataset = DatasetDict(design_datasets)
 
-    dataset_path = os.path.join(output_dir, f"design_{design_num}")
+    dataset_path = os.path.join(output_dir, f"design_{design_num}_{uuid4()}")
     design_dataset.save_to_disk(dataset_path)
 
     print(f"Saved activations for design {design_num}")

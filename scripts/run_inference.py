@@ -17,12 +17,14 @@ See https://hydra.cc/docs/advanced/hydra-command-line-flags/ for more options.
 
 import re
 import os, time, pickle
+from uuid import uuid4
+
 import torch
 from omegaconf import OmegaConf
 import hydra
 import logging
 
-from rfdiffusion.activations import save_activations_incrementally, merge_datasets
+from rfdiffusion.activations import save_activations_incrementally
 from rfdiffusion.util import writepdb_multi, writepdb
 from rfdiffusion.inference import utils as iu
 from hydra.core.hydra_config import HydraConfig
@@ -77,6 +79,8 @@ def main(conf: HydraConfig) -> None:
 
         start_time = time.time()
         out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des}"
+        if conf.inference.use_random_suffix_for_new_design:
+            out_prefix += f"_{uuid4()}"
         log.info(f"Making design {out_prefix}")
         if sampler.inf_conf.cautious and os.path.exists(out_prefix + ".pdb"):
             log.info(
@@ -200,7 +204,6 @@ def main(conf: HydraConfig) -> None:
             )
 
         log.info(f"Finished design in {(time.time()-start_time)/60:.2f} minutes")
-    merge_datasets(all_dataset_paths)
 
 
 if __name__ == "__main__":
