@@ -3,6 +3,7 @@
 defaults:
   - activations: empty
   - ablations: empty
+  - saeinterventions: empty
 
 inference:
   input_pdb: null
@@ -77,6 +78,7 @@ model:
   use_motif_timestep: False
   activations: ${activations}
   ablations: ${ablations}
+  sae_interventions: ${saeinterventions}
   skipped_main_block: -1
   skipped_extra_block: -1
 

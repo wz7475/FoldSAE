@@ -166,6 +166,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                  input_seq_onehot=False,     # For continuous vs. discrete sequence
                  activations=None,
                  ablations=None,
+                 sae_interventions=None,
                  skipped_main_block=-1,
                  skipped_extra_block=-1,
                  ):
@@ -174,6 +175,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                          use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
         self.activations_map = activations
         self.blocks_for_ablation = ablations["ablations"]
+        self.sae_interventions = sae_interventions
         self.simulator = IterativeSimulator(n_extra_block=n_extra_block,
                                             n_main_block=n_main_block,
                                             n_ref_block=n_ref_block,
@@ -223,21 +225,28 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
     def _register_ablation_hooks(self):
 
         class AblateHook:
+            """
+            supports only blocks/layers whose output has same shape as input
+            """
             @torch.no_grad()
             def __call__(self, module, input, output):
-                # if isinstance(input, tuple):
-                #     return (input[0],)
-                print(f"ablation of block {module.__class__.__name__} ######")
-                try:
-                    print(f"input {input.shape}")
-                except AttributeError:
-                    print(f"input {input[0].shape}")
+                if isinstance(input, tuple):
+                    return (input[0],)
                 return input[0]
 
         return [
             self._register_hook_by_path(block_path, AblateHook()) for block_path in self.blocks_for_ablation
         ]
 
+    def _register_sae_intervention_hooks(self):
+
+        class SAEInterventionHook:
+            @torch.no_grad()
+            def __call__(self, module, input, output):
+                print(module.__class__.__name__)
+                return output
+
+        return [self._register_hook_by_path(block_path, SAEInterventionHook()) for block_path in self.sae_interventions["blocks"]]
 
 
     def run_with_hooks(self, msa_latent, msa_full, seq, xyz, idx, t,
@@ -250,6 +259,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
         activation_hooks = self._register_cache_hooks(activations_dict)
         ablation_hooks = self._register_ablation_hooks()
+        sae_intervention_hooks = self._register_sae_intervention_hooks()
 
         output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
                 t1d, t2d, xyz_t, alpha_t,
@@ -257,7 +267,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 return_raw, return_full, return_infer,
                 use_checkpoint, motif_mask, i_cycle, n_cycle)
 
-        for hook in activation_hooks + ablation_hooks:
+        for hook in activation_hooks + ablation_hooks + sae_intervention_hooks:
             hook.remove()
 
         return *output, activations_dict
