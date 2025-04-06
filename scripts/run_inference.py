@@ -111,7 +111,8 @@ def main(conf: HydraConfig) -> None:
                     activations_per_design[key] += activations_dict[key]
                 else:
                     activations_per_design[key] = activations_dict[key]
-        save_activations_incrementally(activations_per_design, i_des, conf.activations.dataset_path)
+        if conf.activations.dataset_path:
+            save_activations_incrementally(activations_per_design, i_des, conf.activations.dataset_path)
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)

@@ -2,6 +2,8 @@ from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
+
 from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
 from rfdiffusion.Track_module import IterativeSimulator, IterBlockOutput
 from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
@@ -11,9 +13,9 @@ from rfdiffusion.sae.sae import SAE
 
 
 class RoseTTAFoldModule(nn.Module):
-    def __init__(self, 
-                 n_extra_block, 
-                 n_main_block, 
+    def __init__(self,
+                 n_extra_block,
+                 n_main_block,
                  n_ref_block,
                  d_msa,
                  d_msa_full,
@@ -67,7 +69,7 @@ class RoseTTAFoldModule(nn.Module):
         self.c6d_pred = DistanceNetwork(d_pair, p_drop=p_drop)
         self.aa_pred = MaskedTokenNetwork(d_msa)
         self.lddt_pred = LDDTNetwork(d_state)
-       
+
         self.exp_pred = ExpResolvedNetwork(d_msa, d_state)
 
     def forward(self, msa_latent, msa_full, seq, xyz, idx, t,
@@ -101,13 +103,13 @@ class RoseTTAFoldModule(nn.Module):
 
         # add template embedding
         pair, state = self.templ_emb(t1d, t2d, alpha_t, xyz_t, pair, state, use_checkpoint=use_checkpoint)
-        
+
         # Predict coordinates from given inputs
         is_frozen_residue = motif_mask if self.freeze_track_motif else torch.zeros_like(motif_mask).bool()
         msa, pair, R, T, alpha_s, state = self.simulator(seq, msa_latent, msa_full, pair, xyz[:,:,:3],
                                                          state, idx, use_checkpoint=use_checkpoint,
                                                          motif_mask=is_frozen_residue)
-        
+
         if return_raw:
             # get last structure
             xyz = einsum('bnij,bnaj->bnai', R[-1], xyz[:,:,:3]-xyz[:,:,1].unsqueeze(-2)) + T[-1].unsqueeze(-2)
@@ -115,14 +117,14 @@ class RoseTTAFoldModule(nn.Module):
 
         # predict masked amino acids
         logits_aa = self.aa_pred(msa)
-        
+
         # Predict LDDT
         lddt = self.lddt_pred(state)
 
         if return_infer:
             # get last structure
             xyz = einsum('bnij,bnaj->bnai', R[-1], xyz[:,:,:3]-xyz[:,:,1].unsqueeze(-2)) + T[-1].unsqueeze(-2)
-            
+
             # get scalar plddt
             nbin = lddt.shape[1]
             bin_step = 1.0 / nbin
@@ -135,10 +137,10 @@ class RoseTTAFoldModule(nn.Module):
         #
         # predict distogram & orientograms
         logits = self.c6d_pred(pair)
-        
+
         # predict experimentally resolved or not
         logits_exp = self.exp_pred(msa[:,0], state)
-        
+
         # get all intermediate bb structures
         xyz = einsum('rbnij,bnaj->rbnai', R, xyz[:,:,:3]-xyz[:,:,1].unsqueeze(-2)) + T.unsqueeze(-2)
 
@@ -176,7 +178,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         super().__init__(n_extra_block, n_main_block, n_ref_block, d_msa, d_msa_full, d_pair, d_templ, n_head_msa,
                          n_head_pair, n_head_templ, d_hidden, d_hidden_templ, p_drop, d_t1d, d_t2d, T,
                          use_motif_timestep, freeze_track_motif, SE3_param_full, SE3_param_topk, input_seq_onehot)
-        self.activations_map = activations["map"]
+        self.activations_map = activations["map"] if activations["map"] else {}
         self.blocks_for_ablation = ablations["ablations"]
         self.sae_interventions = sae_interventions
         self.simulator = IterativeSimulator(n_extra_block=n_extra_block,
@@ -200,7 +202,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         return module.register_forward_hook(hook)
 
     @staticmethod
-    def _transform_iter_block_output(output: IterBlockOutput) -> Tuple[list[torch.Tensor], list[torch.Tensor]]:
+    def transform_from_iter_block_output(output: IterBlockOutput) -> Tuple[list[torch.Tensor], list[torch.Tensor]]:
         """
         output of main block - tuple of 6 tensors
         torch.Size([1, 1, seq_len, 256])
@@ -221,11 +223,48 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         pair = list(output[1].detach().cpu().reshape(output[1].shape[1] * output[1].shape[2], -1).unbind(0))
         return pair, non_pair
 
+    @staticmethod
+    def transform_to_iter_block_output(pair: torch.Tensor, non_pair: torch.Tensor) -> IterBlockOutput:
+        """
+        Transform tensors back into IterBlockOutput tuple of 6 tensors.
+
+        Args:
+            pair: Tensor of shape (seq_len * seq_len, 128)
+            non_pair: Tensor of shape (seq_len, 296)
+
+        Returns:
+            IterBlockOutput: tuple of 6 tensors with shapes:
+            1. torch.Size([1, 1, seq_len, 256])
+            2. torch.Size([1, seq_len, seq_len, 128])
+            3. torch.Size([1, seq_len, 3, 3])
+            4. torch.Size([1, seq_len, 3])
+            5. torch.Size([1, seq_len, 8])
+            6. torch.Size([1, seq_len, 10, 2])
+        """
+        seq_len = non_pair.shape[0]
+
+        # Split non_pair into its components
+        # 296 = 256 + 9 + 3 + 8 + 20
+        splits = [256, 9, 3, 8, 20]
+        components = torch.split(non_pair, splits, dim=1)
+
+        # Reshape each component back to its original shape
+        tensor1 = components[0].reshape(1, 1, seq_len, 256)
+        tensor3 = components[1].reshape(1, seq_len, 3, 3)
+        tensor4 = components[2].reshape(1, seq_len, 3)
+        tensor5 = components[3].reshape(1, seq_len, 8)
+        tensor6 = components[4].reshape(1, seq_len, 10, 2)
+
+        # Reshape pair tensor
+        tensor2 = pair.reshape(1, seq_len, seq_len, 128)
+
+        return IterBlockOutput(tensor1, tensor2, tensor3, tensor4, tensor5, tensor6)
+
     def _register_cache_hooks(self, cache: dict):
         def getActivation(name):
             def hook(model, input, output):
                 if isinstance(output, IterBlockOutput):
-                    cache[f"{name}_pair"], cache[f"{name}_non_pair"] = self._transform_iter_block_output(output)
+                    cache[f"{name}_pair"], cache[f"{name}_non_pair"] = self.transform_from_iter_block_output(output)
                 elif isinstance(output, torch.Tensor):
                     cache[name] = output.detach().cpu()
                 else:
@@ -253,18 +292,40 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
     def _register_sae_intervention_hooks(self):
 
         class SAEInterventionHook:
-            def __init__(self, sae_for_pair: SAE, sae_for_non_pair: SAE):
-                self.sae_for_pair = sae_for_pair
-                self.sae_for_non_pair = sae_for_non_pair
+            def __init__(self, sae_for_pair: SAE, sae_for_non_pair: SAE, batch_size: int = 512):
+                if torch.cuda.is_available():
+                    self.device = torch.device('cuda')
+                else:
+                    self.device = torch.device('cpu')
+                self.sae_for_pair = sae_for_pair.to(self.device)
+                self.sae_for_non_pair = sae_for_non_pair.to(self.device)
+                self.batch_size = batch_size
                 self.sae_for_pair.eval()
                 self.sae_for_non_pair.eval()
 
+
             @torch.no_grad()
             def __call__(self, module, input, output):
-                print(module.__class__.__name__)
-                return output
+                pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
+                pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
+                non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
+                reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
+                with torch.no_grad():
+                    for batch in pairs_dataloader:
+                        batch = batch[0].to(self.device)
+                        reconstructed_pair_batches.append(self.sae_for_pair(batch)[1])
+                    for batch in non_pairs_dataloader:
+                        batch = batch[0].to(self.device)
+                        reconstructed_non_pair_batches.append(self.sae_for_non_pair(batch)[1])
+                reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
+                reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
+                return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
 
-        return [self._register_hook_by_path(block_path, SAEInterventionHook(SAE(128, 128*3), SAE(296, 296*3))) for block_path in self.sae_interventions["blocks"]]
+        sae_batch_size = self.sae_interventions["batch_size"]
+        return [
+            self._register_hook_by_path(block_path, SAEInterventionHook(SAE(128, 128*3), SAE(296, 296*3), sae_batch_size))
+            for block_path in self.sae_interventions["blocks"]
+        ]
 
 
     def run_with_hooks(self, msa_latent, msa_full, seq, xyz, idx, t,

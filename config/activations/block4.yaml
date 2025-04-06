@@ -1,4 +1,4 @@
 map:
   simulator.main_block.4: block4
-#  as many pairs as needed, but only IterBlock supported
+#  as many pairs as needed
 dataset_path: activation_datasets_debug

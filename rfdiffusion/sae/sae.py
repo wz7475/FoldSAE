@@ -2,7 +2,7 @@ from torch import nn
 
 class SAE(nn.Module):
     def __init__(self, input_dim, latent_dim):
-        super().__init__(self)
+        super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, latent_dim),
             nn.GELU()

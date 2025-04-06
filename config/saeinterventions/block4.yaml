@@ -1,3 +1,4 @@
 blocks: [
   simulator.main_block.4
 ]
+batch_size: 512
