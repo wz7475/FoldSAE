@@ -30,6 +30,8 @@ cd ../..
 # https://github.com/RosettaCommons/RFdiffusion/issues/306
 pip install torchdata==0.9.0
 
+pip install hydra-core pyrsistent pandas datasets
+
 #https://discuss.pytorch.org/t/modulenotfounderror-no-module-named-torch-utils-import-utils/208935
 # suggest pip install torch==2.1.0 torchdata==0.7.0
 # but oldest torch na mac m1/m4 is 2.2.0 :( -> dead end

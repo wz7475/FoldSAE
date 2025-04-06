@@ -10,5 +10,4 @@ cd ../..
 pip install -e .
 
 
-pip install hydra-core pyrsistent
-pip install pandas
+pip install hydra-core pyrsistent pandas datasets
