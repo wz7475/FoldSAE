@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=20048)
     parser.add_argument("--dataset_name", default="block4_pair")
     parser.add_argument("--env_path", default="/home/wzarzecki/envs/.env_sae")
-    parser.add_argument("--disable_wandb", "--d", action="store_true")
+    parser.add_argument("--disable_wandb", "-d", action="store_true")
     args = parser.parse_args()
     activations_dir = args.activations_dir
     batch_size = args.batch_size
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     else:
         logger = CSVLogger("csv_logs")
 
-    trainer = Trainer(max_epochs=2, logger=logger)
+    trainer = Trainer(max_epochs=1, logger=logger, log_every_n_steps=1, accelerator="gpu", devices=1)
     trainer.fit(model, datamodule=datamodule)
     test_result = trainer.test(model, datamodule=datamodule)
     print(f"Test result: {test_result}")
