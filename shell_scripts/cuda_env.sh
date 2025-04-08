@@ -10,4 +10,6 @@ cd ../..
 pip install -e .
 
 
-pip install hydra-core pyrsistent pandas datasets
+pip install hydra-core pyrsistent pandas datasets lighntinig python-dotenv
+pip install wandb
+pip install --upgrade wandb
