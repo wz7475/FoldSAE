@@ -1,6 +1,5 @@
+# python 3.8 required
 
-conda create -n clean python==3.8 -y # 3.10 does not work
-conda activate clean
 pip install -r CLEAN/app/requirements.txt
 
 #conda install pytorch==1.11.0 cpuonly -c pytorch

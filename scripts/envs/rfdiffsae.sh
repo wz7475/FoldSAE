@@ -1,3 +1,5 @@
+# python 3.10 required
+
 conda install pytorch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 pytorch-cuda=12.4 -c pytorch -c nvidia
 
 conda install -c dglteam/label/th24_cu124 dgl
