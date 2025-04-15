@@ -2,14 +2,12 @@ from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader
-
-from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
-from rfdiffusion.Track_module import IterativeSimulator, IterBlockOutput
-from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
 from opt_einsum import contract as einsum
 
-from rfdiffusion.sae.sae import SAE
+from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
+from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
+from rfdiffusion.Track_module import IterativeSimulator, IterBlockOutput
+from rfdiffusion.sae.universalsae import Sae
 
 
 class RoseTTAFoldModule(nn.Module):
@@ -194,6 +192,10 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                                             skipped_main_block=skipped_main_block,
                                             skipped_extra_block=skipped_extra_block,
                                             )
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
 
     def _register_hook_by_path(self, block_path: str, hook: Callable):
         module = self
@@ -292,7 +294,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
     def _register_sae_intervention_hooks(self):
 
         class SAEInterventionHook:
-            def __init__(self, sae_for_pair: SAE, sae_for_non_pair: SAE, batch_size: int = 512):
+            def __init__(self, sae_for_pair: Sae, sae_for_non_pair: Sae, batch_size: int = 512):
                 if torch.cuda.is_available():
                     self.device = torch.device('cuda')
                 else:
@@ -306,24 +308,31 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
             @torch.no_grad()
             def __call__(self, module, input, output):
-                pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
-                pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
-                non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
-                reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
-                with torch.no_grad():
-                    for batch in pairs_dataloader:
-                        batch = batch[0].to(self.device)
-                        reconstructed_pair_batches.append(self.sae_for_pair(batch)[1])
-                    for batch in non_pairs_dataloader:
-                        batch = batch[0].to(self.device)
-                        reconstructed_non_pair_batches.append(self.sae_for_non_pair(batch)[1])
-                reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
-                reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
-                return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
+                # pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
+                # pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
+                # non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
+                # reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
+                # with torch.no_grad():
+                #     for batch in pairs_dataloader:
+                #         batch = batch[0].to(self.device)
+                #         reconstructed_pair_batches.append(self.sae_for_pair(batch)[1])
+                #     for batch in non_pairs_dataloader:
+                #         batch = batch[0].to(self.device)
+                #         reconstructed_non_pair_batches.append(self.sae_for_non_pair(batch)[1])
+                # reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
+                # reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
+                # return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
+                print(f"DEBUG: sae class {self.sae_for_pair.__class__.__name__}")
+                return output
 
         sae_batch_size = self.sae_interventions["batch_size"]
         return [
-            self._register_hook_by_path(block_path, SAEInterventionHook(SAE(128, 128*3), SAE(296, 296*3), sae_batch_size))
+            self._register_hook_by_path(block_path, SAEInterventionHook(
+                # SAE(128, 128*3),
+                # SAE(296, 296*3), sae_batch_size)
+                Sae.load_from_disk(self.sae_interventions.sae_pair_path, self.device),
+                Sae.load_from_disk(self.sae_interventions.sae_non_pair_path, self.device)
+            ))
             for block_path in self.sae_interventions["blocks"]
         ]
 

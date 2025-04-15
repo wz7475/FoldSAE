@@ -1,4 +1,6 @@
 blocks: [
   simulator.main_block.4
 ]
+sae_pair_path: sae-ckpts/RFDiffSAE/patch_topk_expansion_factor32_k32_multi_topkFalse_auxk_alpha0.0_RFDiffSAEactivation_datasets_3x1point4GB_block4_pair/block4_pair
+sae_non_pair_path: sae-ckpts/RFDiffSAE/patch_topk_expansion_factor32_k32_multi_topkFalse_auxk_alpha0.0_RFDiffSAEactivation_datasets_3x1point4GB_block4_non_pair/block4_non_pair
 batch_size: 512

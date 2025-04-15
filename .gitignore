@@ -18,3 +18,11 @@ tests/tests_*
 .idea
 dgl
 example_outputs
+activation_dataset*
+wandb_logs
+temp
+outputs
+merged_activation_dataset
+lightning_logs
+csv_logs
+activations_*

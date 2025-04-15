@@ -1,2 +1,4 @@
 blocks: []
 batch_size: null
+sae_pair_path: null
+sae_non_pair_path: null
