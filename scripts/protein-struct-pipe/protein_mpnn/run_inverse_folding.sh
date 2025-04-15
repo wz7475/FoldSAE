@@ -5,7 +5,7 @@
 
 pdb_dir="$1"
 output_dir="$2"
-PYTHON_EXEC=${3:-/home/wzarzecki/miniforge3/envs/uncond38/bin/python}
+PYTHON_EXEC=${3:-/raid/battleamp_root/miniforge3/envs/mpnn/bin/python}
 
 if [ ! -d $output_dir ]
 then
@@ -19,7 +19,7 @@ do
             --pdb_path $pdb_file \
             --out_folder $output_dir \
             --num_seq_per_target 2 \
-            --sampling_temp "0.1" \
+            --sampling_temp "0.1" \v
             --seed 37 \
             --batch_size 1
 done
