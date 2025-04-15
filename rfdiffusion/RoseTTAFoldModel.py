@@ -306,6 +306,15 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 self.sae_for_pair.eval()
                 self.sae_for_non_pair.eval()
 
+            @torch.no_grad()
+            def _reconstruct_with_sae(self, sae: Sae, batch: list[torch.Tensor]):
+                batch = batch[0].to(self.device)
+                sae_input, _, _ = sae.preprocess_input(batch.unsqueeze(1))
+                pre_acts = sae.pre_acts(sae_input)
+                top_acts, top_indices = sae.select_topk(pre_acts)
+                buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
+                latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
+                return (latents @ sae.W_dec) + sae.b_dec
 
             @torch.no_grad()
             def __call__(self, module, input, output):
@@ -314,25 +323,10 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
                 reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
                 with torch.no_grad():
-                    # TODO: create helper method to process activations with sae
                     for batch in pairs_dataloader:
-                        batch = batch[0].to(self.device)
-                        sae_input, _, _ = self.sae_for_pair.preprocess_input(batch.unsqueeze(1))
-                        pre_acts = self.sae_for_pair.pre_acts(sae_input)
-                        top_acts, top_indices = self.sae_for_pair.select_topk(pre_acts)
-                        buf = top_acts.new_zeros(top_acts.shape[:-1] + (self.sae_for_pair.W_dec.mT.shape[-1],))
-                        latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-                        sae_out = (latents @ self.sae_for_pair.W_dec) + self.sae_for_pair.b_dec
-                        reconstructed_pair_batches.append(sae_out)
+                        reconstructed_pair_batches.append(self._reconstruct_with_sae(self.sae_for_pair, batch))
                     for batch in non_pairs_dataloader:
-                        batch = batch[0].to(self.device)
-                        sae_input, _, _ = self.sae_for_non_pair.preprocess_input(batch.unsqueeze(1))
-                        pre_acts = self.sae_for_non_pair.pre_acts(sae_input)
-                        top_acts, top_indices = self.sae_for_non_pair.select_topk(pre_acts)
-                        buf = top_acts.new_zeros(top_acts.shape[:-1] + (self.sae_for_non_pair.W_dec.mT.shape[-1],))
-                        latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-                        sae_out = (latents @ self.sae_for_non_pair.W_dec) + self.sae_for_non_pair.b_dec
-                        reconstructed_non_pair_batches.append(sae_out)
+                        reconstructed_non_pair_batches.append(self._reconstruct_with_sae(self.sae_for_non_pair, batch))
                 reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
                 reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
                 return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
