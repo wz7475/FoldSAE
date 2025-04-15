@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 import torch
 import torch.nn as nn
 from opt_einsum import contract as einsum
+from torch.utils.data import DataLoader, TensorDataset
 
 from rfdiffusion.AuxiliaryPredictor import DistanceNetwork, MaskedTokenNetwork, ExpResolvedNetwork, LDDTNetwork
 from rfdiffusion.Embeddings import MSA_emb, Extra_emb, Templ_emb, Recycling
@@ -308,30 +309,41 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
             @torch.no_grad()
             def __call__(self, module, input, output):
-                # pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
-                # pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
-                # non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
-                # reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
-                # with torch.no_grad():
-                #     for batch in pairs_dataloader:
-                #         batch = batch[0].to(self.device)
-                #         reconstructed_pair_batches.append(self.sae_for_pair(batch)[1])
-                #     for batch in non_pairs_dataloader:
-                #         batch = batch[0].to(self.device)
-                #         reconstructed_non_pair_batches.append(self.sae_for_non_pair(batch)[1])
-                # reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
-                # reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
-                # return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
-                print(f"DEBUG: sae class {self.sae_for_pair.__class__.__name__}")
-                return output
+                pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
+                pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
+                non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
+                reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
+                with torch.no_grad():
+                    # TODO: create helper method to process activations with sae
+                    for batch in pairs_dataloader:
+                        batch = batch[0].to(self.device)
+                        sae_input, _, _ = self.sae_for_pair.preprocess_input(batch.unsqueeze(1))
+                        pre_acts = self.sae_for_pair.pre_acts(sae_input)
+                        top_acts, top_indices = self.sae_for_pair.select_topk(pre_acts)
+                        buf = top_acts.new_zeros(top_acts.shape[:-1] + (self.sae_for_pair.W_dec.mT.shape[-1],))
+                        latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
+                        sae_out = (latents @ self.sae_for_pair.W_dec) + self.sae_for_pair.b_dec
+                        reconstructed_pair_batches.append(sae_out)
+                    for batch in non_pairs_dataloader:
+                        batch = batch[0].to(self.device)
+                        sae_input, _, _ = self.sae_for_non_pair.preprocess_input(batch.unsqueeze(1))
+                        pre_acts = self.sae_for_non_pair.pre_acts(sae_input)
+                        top_acts, top_indices = self.sae_for_non_pair.select_topk(pre_acts)
+                        buf = top_acts.new_zeros(top_acts.shape[:-1] + (self.sae_for_non_pair.W_dec.mT.shape[-1],))
+                        latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
+                        sae_out = (latents @ self.sae_for_non_pair.W_dec) + self.sae_for_non_pair.b_dec
+                        reconstructed_non_pair_batches.append(sae_out)
+                reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
+                reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
+                return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
+
 
         sae_batch_size = self.sae_interventions["batch_size"]
         return [
             self._register_hook_by_path(block_path, SAEInterventionHook(
-                # SAE(128, 128*3),
-                # SAE(296, 296*3), sae_batch_size)
                 Sae.load_from_disk(self.sae_interventions.sae_pair_path, self.device),
-                Sae.load_from_disk(self.sae_interventions.sae_non_pair_path, self.device)
+                Sae.load_from_disk(self.sae_interventions.sae_non_pair_path, self.device),
+                sae_batch_size
             ))
             for block_path in self.sae_interventions["blocks"]
         ]
