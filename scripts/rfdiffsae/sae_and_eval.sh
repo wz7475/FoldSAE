@@ -28,8 +28,9 @@ PYTHON_BIOEMB=${7:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 echo "generation of structures ..." ;
 structures_dir="$input_dir/pdb" ;
 # generate structure by RfDiffusion with SAE intervention
-CUDA_VISIBLE_DEVICES=0 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py inference.output_prefix="$structures_dir/$input_dir" \
- 'contigmap.contigs=[100-200]' inference.num_designs="$num_designs" inference.final_step="$final_step" saeinterventions=block4 ;
+#CUDA_VISIBLE_DEVICES=0 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py inference.output_prefix="$structures_dir/$input_dir" \
+# 'contigmap.contigs=[100-200]' inference.num_designs="$num_designs" inference.final_step="$final_step"  \
+# saeinterventions=block4 ;
 # keep only pdb
 rm "$structures_dir"/*.trb ;
 
@@ -45,7 +46,7 @@ sequences_dir="$input_dir/seqs"
 # new structures from sequences with AlphaFold2
 echo "new structures from sequences with AlphaFold2 ..."
 af2_dir="$input_dir/af2"
-CUDA_VISIBLE_DEVICES=0 bash scripts/protein-struct-pipe/colabfold/run_colabfold.sh \
+CUDA_VISIBLE_DEVICES=1 bash scripts/protein-struct-pipe/colabfold/run_colabfold.sh \
   $sequences_dir \
   $af2_dir
 
@@ -53,7 +54,7 @@ CUDA_VISIBLE_DEVICES=0 bash scripts/protein-struct-pipe/colabfold/run_colabfold.
 # comparison of RFDiff and AF2 structures
 echo "comparison of RFDiff and AF2 structures ..."
 results_file=$input_dir/structure_evaluation.csv
-CUDA_VISIBLE_DEVICES=0 bash scripts/protein-struct-pipe/openstructures/evaluate_structures.sh \
+CUDA_VISIBLE_DEVICES=1 bash scripts/protein-struct-pipe/openstructures/evaluate_structures.sh \
   $structures_dir \
   $af2_dir \
   $results_file \
