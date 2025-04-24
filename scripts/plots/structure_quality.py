@@ -56,6 +56,8 @@ if __name__ == "__main__":
     for i, label in enumerate(labels):
         print(f"{label}: RMSD samples={len(rmsd_data[i])}, TM samples={len(tm_data[i])}")
 
+    # sort labels
+    labels, rmsd_data, tm_data = zip(*sorted(zip(labels, rmsd_data, tm_data)))
     # Create figure for RMSD boxplot
     plt.figure(figsize=(max(8, len(labels) * 1.2), 6))
     box = plt.boxplot(rmsd_data, patch_artist=True, notch=True)
