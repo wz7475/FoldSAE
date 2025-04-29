@@ -16,10 +16,12 @@ def save_activations_incrementally(activations_per_design, timesteps, output_dir
     num_timesteps = len(timesteps)
     for key in activations_per_design:
         activations = activations_per_design[key]
-        for activations_start_idx, timestep in zip(list(range(len(activations)))[::num_timesteps], timesteps):
-            activations_per_timestep = activations[activations_start_idx:activations_start_idx + num_timesteps]
+        total_num_of_activations = len(activations)
+        num_of_activation_per_timestep = total_num_of_activations // num_timesteps
+        for idx, activations_start_idx in enumerate(range(0, total_num_of_activations, num_of_activation_per_timestep)):
+            activations_per_timestep = activations[activations_start_idx:activations_start_idx + num_of_activation_per_timestep]
             ds = Dataset.from_dict({
                 "values": activations_per_timestep
             })
-            ds_output_dir = os.path.join(output_dir, key, f"{timestep}")
+            ds_output_dir = os.path.join(output_dir, key, f"{timesteps[idx]}")
             ds.save_to_disk(os.path.join(ds_output_dir, f"{uuid4()}"))
