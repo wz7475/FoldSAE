@@ -1,0 +1,33 @@
+method: grid
+project: RFDiffSAE
+entity: RFDiffSAE
+name: new_activations
+
+
+program: universal-diffsae/src/scripts/train.py
+
+command:
+  - ${env}
+  - CUDA_VISIBLE_DEVICES=2
+  - SAE_DISABLE_TRITON=1
+  - python
+  - ${program}
+  - ${args}
+
+parameters:
+  dataset_path:
+    value: /data/wzarzecki/activations_1200
+  hookpoints:
+    values: [block4_non_pair, block4_pair]
+  effective_batch_size:
+    value: 4096
+  k:
+    values: [32, 64, 128, 256, 512]
+  batch_topk:
+    values: [True, False]
+  expansion_factor:
+    values: [2, 4, 8, 16, 32]
+  max_trainer_steps:
+    value: 50000
+  lr:
+     values: [0.001, 0.005, 0.0001, 0.0005, 0.00001]

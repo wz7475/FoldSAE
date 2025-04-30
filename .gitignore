@@ -1,3 +1,7 @@
 .idea
 sae-ckpts
 wandb
+activation_datasets_debug
+localcolabfold
+outputs
+temp
