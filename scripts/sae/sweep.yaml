@@ -8,7 +8,7 @@ program: universal-diffsae/src/scripts/train.py
 
 command:
   - ${env}
-  - CUDA_VISIBLE_DEVICES=2
+  - CUDA_VISIBLE_DEVICES=0
   - SAE_DISABLE_TRITON=1
   - python
   - ${program}
