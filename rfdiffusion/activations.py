@@ -1,7 +1,8 @@
 import os
-
-from datasets import Dataset, DatasetDict, load_from_disk, concatenate_datasets
+import random
 from uuid import uuid4
+
+from datasets import Dataset
 
 
 def save_activations_incrementally(activations_per_design, timesteps, output_dir="activation_datasets"):
@@ -16,6 +17,9 @@ def save_activations_incrementally(activations_per_design, timesteps, output_dir
     num_timesteps = len(timesteps)
     for key in activations_per_design:
         activations = activations_per_design[key]
+        if "non" not in "key":
+            # pair generates seq_len more activations(seq_len x seq_len) instead of (seq_len)
+            activations = random.sample(activations, int(len(activations) ** .5))
         total_num_of_activations = len(activations)
         num_of_activation_per_timestep = total_num_of_activations // num_timesteps
         for idx, activations_start_idx in enumerate(range(0, total_num_of_activations, num_of_activation_per_timestep)):
