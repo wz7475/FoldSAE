@@ -42,8 +42,8 @@ def make_deterministic(seed=0):
 @hydra.main(version_base=None, config_path="../config", config_name="base")
 def main(conf: HydraConfig) -> None:
     log = logging.getLogger(__name__)
-    if conf.inference.deterministic:
-        make_deterministic()
+    if conf.inference.seed:
+        make_deterministic(conf.inference.seed)
 
     # Check for available GPU and print result of check
     if torch.cuda.is_available():

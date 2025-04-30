@@ -22,11 +22,11 @@ inference:
   align_motif: True
   symmetric_self_cond: True
   final_step: 1
-  deterministic: False
   trb_save_ckpt_path: null
   schedule_directory_path: null
   model_directory_path: null
   use_random_suffix_for_new_design: true
+  seed: null
 
 contigmap:
   contigs: null

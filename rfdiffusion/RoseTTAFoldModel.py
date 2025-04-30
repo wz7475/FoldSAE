@@ -314,7 +314,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 top_acts, top_indices = sae.select_topk(pre_acts)
                 buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
                 latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-                return (latents @ sae.W_dec) + sae.b_dec
+                return (latents @ sae.W_dec) + sae.b_dec # TODO return latents as well
 
             @torch.no_grad()
             def __call__(self, module, input, output):
@@ -323,10 +323,12 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
                 reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
                 with torch.no_grad():
+                    # todo collect latents and concat into 128 + 296 long tensor
                     for batch in pairs_dataloader:
                         reconstructed_pair_batches.append(self._reconstruct_with_sae(self.sae_for_pair, batch))
                     for batch in non_pairs_dataloader:
                         reconstructed_non_pair_batches.append(self._reconstruct_with_sae(self.sae_for_non_pair, batch))
+                    # TODO save
                 reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
                 reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
                 return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
