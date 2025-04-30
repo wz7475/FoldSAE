@@ -109,9 +109,10 @@ def main(conf: HydraConfig) -> None:
             # if t % 1 == 0: # change to every n-th step from config
             for key in activations_dict:
                 if activations_per_design.get(key):
-                    activations_per_design[key] += activations_dict[key]
+                    activations_per_design[key][t] = activations_dict[key]
                 else:
-                    activations_per_design[key] = activations_dict[key]
+                    activations_per_design[key] = {}
+                    activations_per_design[key][t] = activations_dict[key]
             timesteps.append(t)
         if conf.activations.dataset_path:
             save_activations_incrementally(activations_per_design, timesteps, conf.activations.dataset_path)
