@@ -1,7 +1,9 @@
+import os
 from typing import Callable, Tuple
 
 import torch
 import torch.nn as nn
+from datasets import Dataset
 from opt_einsum import contract as einsum
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -292,10 +294,13 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             self._register_hook_by_path(block_path, AblateHook()) for block_path in self.blocks_for_ablation
         ]
 
-    def _register_sae_intervention_hooks(self):
+    def _register_sae_intervention_hooks(self, structure_id: None | str = None, timestep: None | str = None ):
 
         class SAEInterventionHook:
-            def __init__(self, sae_for_pair: Sae, sae_for_non_pair: Sae, batch_size: int = 512):
+            def __init__(self, sae_for_pair: Sae, sae_for_non_pair: Sae, batch_size: int = 512,
+                         structure_id: None | str = None, basedir_for_sae_latents: None | str = None, timestep: None | int = None
+                         ):
+                self.basedir_for_sae_latents = basedir_for_sae_latents
                 if torch.cuda.is_available():
                     self.device = torch.device('cuda')
                 else:
@@ -305,6 +310,8 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 self.batch_size = batch_size
                 self.sae_for_pair.eval()
                 self.sae_for_non_pair.eval()
+                self.structure_id = structure_id
+                self.timestep = timestep
 
             @torch.no_grad()
             def _reconstruct_with_sae(self, sae: Sae, batch: list[torch.Tensor]):
@@ -314,7 +321,17 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 top_acts, top_indices = sae.select_topk(pre_acts)
                 buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
                 latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-                return (latents @ sae.W_dec) + sae.b_dec # TODO return latents as well
+                return (latents @ sae.W_dec) + sae.b_dec, latents
+
+            def _save_latents_to_disk_as_hf_dataset(self, latents: torch.Tensor | list[torch.Tensor], subdir: str):
+                # TODO: param to save only subset of activations (used in case of "pair")
+                path = os.path.join(self.basedir_for_sae_latents, subdir, f"{self.timestep}", self.structure_id)
+                os.makedirs(path, exist_ok=True)
+                Dataset.from_dict({
+                    "values": latents
+                }).save_to_disk(path)
+                print(f"-- saved to {path} --")
+
 
             @torch.no_grad()
             def __call__(self, module, input, output):
@@ -322,15 +339,23 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
                 non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
                 reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
+                latents_pair_batches, latents_non_pair_batches = [], []
                 with torch.no_grad():
-                    # todo collect latents and concat into 128 + 296 long tensor
                     for batch in pairs_dataloader:
-                        reconstructed_pair_batches.append(self._reconstruct_with_sae(self.sae_for_pair, batch))
+                        reconstruction, latents = self._reconstruct_with_sae(self.sae_for_pair, batch)
+                        reconstructed_pair_batches.append(reconstruction)
+                        latents_pair_batches.append(latents)
                     for batch in non_pairs_dataloader:
-                        reconstructed_non_pair_batches.append(self._reconstruct_with_sae(self.sae_for_non_pair, batch))
-                    # TODO save
+                        reconstruction, latents = self._reconstruct_with_sae(self.sae_for_non_pair, batch)
+                        reconstructed_non_pair_batches.append(reconstruction)
+                        latents_non_pair_batches.append(latents)
                 reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
                 reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
+                if self.basedir_for_sae_latents: # if path for latents activations given, save path
+                    latents_pair_tensor = torch.cat(latents_pair_batches, dim=0)
+                    latents_non_pair_tensor = torch.cat(latents_non_pair_batches, dim=0)
+                    self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair")
+                    self._save_latents_to_disk_as_hf_dataset(latents_non_pair_tensor, "non_pair")
                 return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
 
 
@@ -339,7 +364,10 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             self._register_hook_by_path(block_path, SAEInterventionHook(
                 Sae.load_from_disk(self.sae_interventions.sae_pair_path, self.device),
                 Sae.load_from_disk(self.sae_interventions.sae_non_pair_path, self.device),
-                sae_batch_size
+                sae_batch_size,
+                structure_id,
+                self.sae_interventions.sae_latents_base_dir,
+                timestep
             ))
             for block_path in self.sae_interventions["blocks"]
         ]
@@ -349,13 +377,13 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                        t1d=None, t2d=None, xyz_t=None, alpha_t=None,
                        msa_prev=None, pair_prev=None, state_prev=None,
                        return_raw=False, return_full=False, return_infer=False,
-                       use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None):
+                       use_checkpoint=False, motif_mask=None, i_cycle=None, n_cycle=None, structure_id: None | str = None):
 
         activations_dict = {}
 
         activation_hooks = self._register_cache_hooks(activations_dict)
         ablation_hooks = self._register_ablation_hooks()
-        sae_intervention_hooks = self._register_sae_intervention_hooks()
+        sae_intervention_hooks = self._register_sae_intervention_hooks(structure_id, t.item())
 
         output = self.forward(msa_latent, msa_full, seq, xyz, idx, t,
                 t1d, t2d, xyz_t, alpha_t,

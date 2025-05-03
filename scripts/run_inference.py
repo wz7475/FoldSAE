@@ -73,13 +73,14 @@ def main(conf: HydraConfig) -> None:
         design_startnum = max(indices) + 1
 
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
-        if conf.inference.deterministic:
-            make_deterministic(i_des)
+        if conf.inference.seed:
+            make_deterministic(conf.inference.seed+i_des)
 
         start_time = time.time()
         out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des}"
         if conf.inference.use_random_suffix_for_new_design:
             out_prefix += f"_{uuid4()}"
+        structure_id = os.path.split(out_prefix)[1]
         log.info(f"Making design {out_prefix}")
         if sampler.inf_conf.cautious and os.path.exists(out_prefix + ".pdb"):
             log.info(
@@ -100,7 +101,7 @@ def main(conf: HydraConfig) -> None:
         timesteps = []
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
             px0, x_t, seq_t, plddt, activations_dict = sampler.sample_step(
-                t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step
+                t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step, structure_id=structure_id
             )
             px0_xyz_stack.append(px0)
             denoised_xyz_stack.append(x_t)

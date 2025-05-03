@@ -2,3 +2,4 @@ blocks: []
 batch_size: null
 sae_pair_path: null
 sae_non_pair_path: null
+sae_latents_base_dir: null

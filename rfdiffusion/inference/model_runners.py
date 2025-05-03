@@ -621,7 +621,7 @@ class SelfConditioning(Sampler):
     pX0[t+1] is provided as a template input to the model at time t
     """
 
-    def sample_step(self, *, t, x_t, seq_init, final_step):
+    def sample_step(self, *, t, x_t, seq_init, final_step, structure_id: None | str = None):
         '''
         Generate the next pose that the model should be supplied at timestep t-1.
         Args:
@@ -675,7 +675,8 @@ class SelfConditioning(Sampler):
                                                                                                                 state_prev = None,
                                                                                                                 t=torch.tensor(t),
                                                                                                                 return_infer=True,
-                                                                                                                motif_mask=self.diffusion_mask.squeeze().to(self.device))
+                                                                                                                motif_mask=self.diffusion_mask.squeeze().to(self.device),
+                                                                                                                structure_id=structure_id)
 
             if self.symmetry is not None and self.inf_conf.symmetric_self_cond:
                 px0 = self.symmetrise_prev_pred(px0=px0,seq_in=seq_in, alpha=alpha)[:,:,:3]
