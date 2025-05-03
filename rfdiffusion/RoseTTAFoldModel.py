@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Callable, Tuple
 
 import torch
@@ -323,14 +324,18 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
                 return (latents @ sae.W_dec) + sae.b_dec, latents
 
-            def _save_latents_to_disk_as_hf_dataset(self, latents: torch.Tensor | list[torch.Tensor], subdir: str):
-                # TODO: param to save only subset of activations (used in case of "pair")
+            def _save_latents_to_disk_as_hf_dataset(self, latents: torch.Tensor, subdir: str,
+                    save_n_random: int | None = None
+            ):
+                if save_n_random:
+                    indices = random.sample(range(latents.shape[0]), save_n_random)
+                    latents = latents[indices]
                 path = os.path.join(self.basedir_for_sae_latents, subdir, f"{self.timestep}", self.structure_id)
                 os.makedirs(path, exist_ok=True)
                 Dataset.from_dict({
                     "values": latents
                 }).save_to_disk(path)
-                print(f"-- saved to {path} --")
+                print(f"-- saved {latents.shape[0]} activations to {path} --")
 
 
             @torch.no_grad()
@@ -354,7 +359,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 if self.basedir_for_sae_latents: # if path for latents activations given, save path
                     latents_pair_tensor = torch.cat(latents_pair_batches, dim=0)
                     latents_non_pair_tensor = torch.cat(latents_non_pair_batches, dim=0)
-                    self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair")
+                    self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair", save_n_random=int(len(pairs)**.5))
                     self._save_latents_to_disk_as_hf_dataset(latents_non_pair_tensor, "non_pair")
                 return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
 
