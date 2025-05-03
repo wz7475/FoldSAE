@@ -98,7 +98,6 @@ def main(conf: HydraConfig) -> None:
         seq_t = torch.clone(seq_init)
         # Loop over number of reverse diffusion time steps.
         activations_per_design = {}
-        timesteps = []
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
             px0, x_t, seq_t, plddt, activations_dict = sampler.sample_step(
                 t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step, structure_id=structure_id
@@ -114,9 +113,8 @@ def main(conf: HydraConfig) -> None:
                 else:
                     activations_per_design[key] = {}
                     activations_per_design[key][t] = activations_dict[key]
-            timesteps.append(t)
         if conf.activations.dataset_path:
-            save_activations_incrementally(activations_per_design, timesteps, conf.activations.dataset_path)
+            save_activations_incrementally(activations_per_design, conf.activations.dataset_path)
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)

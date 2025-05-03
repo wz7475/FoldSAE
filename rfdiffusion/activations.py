@@ -5,7 +5,7 @@ from uuid import uuid4
 from datasets import Dataset
 
 
-def save_activations_incrementally(activations_per_design, timesteps, output_dir="activation_datasets"):
+def save_activations_incrementally(activations_per_design, output_dir="activation_datasets"):
     """
     Save activations for a single design incrementally. Adds random identifier not to other write design with same
     index.
