@@ -115,7 +115,7 @@ def main(conf: HydraConfig) -> None:
                         activations_per_design[key] = {}
                         activations_per_design[key][t] = activations_dict[key]
         except np.linalg.LinAlgError as e:
-            print(f"caight np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
+            print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
             continue
         except Exception as e:
             print(f"exception {e}")
