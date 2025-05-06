@@ -315,7 +315,7 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 self.timestep = timestep
 
             @torch.no_grad()
-            def _reconstruct_with_sae(self, sae: Sae, batch: list[torch.Tensor]):
+            def _reconstruct_batch_with_sae(self, sae: Sae, batch: list[torch.Tensor]):
                 batch = batch[0].to(self.device)
                 sae_input, _, _ = sae.preprocess_input(batch.unsqueeze(1))
                 pre_acts = sae.pre_acts(sae_input)
@@ -337,9 +337,8 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 }).save_to_disk(path)
                 print(f"-- saved {latents.shape[0]} activations to {path} --")
 
-
             @torch.no_grad()
-            def __call__(self, module, input, output):
+            def _reconstruct_with_sae(self, output, path_for_latents: str | None):
                 pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
                 pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
                 non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
@@ -347,22 +346,31 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 latents_pair_batches, latents_non_pair_batches = [], []
                 with torch.no_grad():
                     for batch in pairs_dataloader:
-                        reconstruction, latents = self._reconstruct_with_sae(self.sae_for_pair, batch)
+                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_pair, batch)
                         reconstructed_pair_batches.append(reconstruction)
                         latents_pair_batches.append(latents)
                     for batch in non_pairs_dataloader:
-                        reconstruction, latents = self._reconstruct_with_sae(self.sae_for_non_pair, batch)
+                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_non_pair, batch)
                         reconstructed_non_pair_batches.append(reconstruction)
                         latents_non_pair_batches.append(latents)
                 reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
                 reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
-                if self.basedir_for_sae_latents: # if path for latents activations given, save path
+                if path_for_latents:  # if path for latents activations given, save path
                     latents_pair_tensor = torch.cat(latents_pair_batches, dim=0)
                     latents_non_pair_tensor = torch.cat(latents_non_pair_batches, dim=0)
-                    self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair", save_n_random=int(len(pairs)**.5))
+                    self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair",
+                                                             save_n_random=int(len(pairs) ** .5))
                     self._save_latents_to_disk_as_hf_dataset(latents_non_pair_tensor, "non_pair")
-                return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor, reconstructed_non_pair_tensor)
+                return HookedRoseTTAFoldModule.transform_to_iter_block_output(reconstructed_pair_tensor,
+                                                                              reconstructed_non_pair_tensor)
 
+            @torch.no_grad()
+            def __call__(self, module, input, output):
+                x = output
+                x2 = self._reconstruct_with_sae(x, path_for_latents=self.basedir_for_sae_latents)
+                e = IterBlockOutput(*(x_elem - x2_elem for x_elem, x2_elem in zip(x, x2)))
+                x3 = self._reconstruct_with_sae(x, save_latents=False) # todo: blocking channels
+                return IterBlockOutput(*(x3_elem + e_elem for x3_elem, e_elem in zip(x3, e)))
 
         sae_batch_size = self.sae_interventions["batch_size"]
         return [
