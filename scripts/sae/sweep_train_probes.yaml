@@ -1,0 +1,28 @@
+method: grid
+project: RFDiffSAE
+entity: RFDiffSAE
+name: probes
+
+
+program: universal-diffsae/notebooks/script.py
+
+command:
+  - ${env}
+  - SAE_DISABLE_TRITON=1
+  - python
+  - ${program}
+  - ${args}
+
+parameters:
+  base_dir:
+    value: /data/wzarzecki/ds_sae_latents_500x
+  sae_type:
+    values: [pair, non_pair]
+  target_label:
+    values: ["Cytoplasm", "Nucleus", "Mitochondrion", "Extra - cellular" ]
+  lr:
+    value: 0.001
+  max_epochs:
+    value: 50
+  cuda_devices:
+    value: 0
