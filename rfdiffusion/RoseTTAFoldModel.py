@@ -299,7 +299,9 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
         class SAEInterventionHook:
             def __init__(self, sae_for_pair: Sae, sae_for_non_pair: Sae, batch_size: int = 512,
-                         structure_id: None | str = None, basedir_for_sae_latents: None | str = None, timestep: None | int = None
+                         structure_id: None | str = None, basedir_for_sae_latents: None | str = None, timestep: None | int = None,
+                         intervention_indices_for_pair: torch.Tensor | str = None, intervention_indices_for_non_pair: torch.Tensor | str = None,
+                         intervention_multiplier: float | None = None
                          ):
                 self.basedir_for_sae_latents = basedir_for_sae_latents
                 if torch.cuda.is_available():
@@ -313,15 +315,31 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 self.sae_for_non_pair.eval()
                 self.structure_id = structure_id
                 self.timestep = timestep
+                self.intervention_multiplier = intervention_multiplier
+                self.intervention_indices_for_pair = intervention_indices_for_pair.to(self.device)
+                self.intervention_indices_for_non_pair = intervention_indices_for_non_pair.to(self.device)
+                self.intervention_multiplier = intervention_multiplier
 
-            @torch.no_grad()
-            def _reconstruct_batch_with_sae(self, sae: Sae, batch: list[torch.Tensor]):
+            @staticmethod
+            def _update_sae_latents(latents: torch.Tensor, indices: torch.Tensor, multiplier: int) -> torch.Tensor:
+                latents[:, indices] *= multiplier
+                return latents
+
+            def _reconstruct_batch_with_sae(
+                self, 
+                sae: Sae, 
+                batch: list[torch.Tensor],
+                indices_to_modify: torch.Tensor | None = None,
+                multiplier: int | None = None,
+            ):
                 batch = batch[0].to(self.device)
                 sae_input, _, _ = sae.preprocess_input(batch.unsqueeze(1))
                 pre_acts = sae.pre_acts(sae_input)
                 top_acts, top_indices = sae.select_topk(pre_acts)
                 buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
                 latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
+                if indices_to_modify is not None and multiplier is not None:
+                    latents  = self._update_sae_latents(latents, indices_to_modify, multiplier)
                 return (latents @ sae.W_dec) + sae.b_dec, latents
 
             def _save_latents_to_disk_as_hf_dataset(self, latents: torch.Tensor, subdir: str,
@@ -337,20 +355,31 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 }).save_to_disk(path)
                 print(f"-- saved {latents.shape[0]} activations to {path} --")
 
-            @torch.no_grad()
-            def _reconstruct_with_sae(self, output, path_for_latents: str | None):
+            def _reconstruct_with_sae(
+                    self,
+                    output, path_for_latents: str | None,
+                    make_intervention: bool | None = None,
+            ):
                 pairs, non_pairs = HookedRoseTTAFoldModule.transform_from_iter_block_output(output)
                 pairs_dataloader = DataLoader(TensorDataset(torch.stack(pairs)), self.batch_size)
                 non_pairs_dataloader = DataLoader(TensorDataset(torch.stack(non_pairs)), self.batch_size)
                 reconstructed_pair_batches, reconstructed_non_pair_batches = [], []
                 latents_pair_batches, latents_non_pair_batches = [], []
+                if make_intervention:
+                    probes_pair_indices = self.intervention_indices_for_pair
+                    probes_non_pair_indices = self.intervention_indices_for_non_pair
+                    intervention_multiplier = self.intervention_multiplier
+                else:
+                    probes_pair_indices = None
+                    probes_non_pair_indices = None
+                    intervention_multiplier = None
                 with torch.no_grad():
                     for batch in pairs_dataloader:
-                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_pair, batch)
+                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_pair, batch, probes_pair_indices, intervention_multiplier)
                         reconstructed_pair_batches.append(reconstruction)
                         latents_pair_batches.append(latents)
                     for batch in non_pairs_dataloader:
-                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_non_pair, batch)
+                        reconstruction, latents = self._reconstruct_batch_with_sae(self.sae_for_non_pair, batch, probes_non_pair_indices, intervention_multiplier)
                         reconstructed_non_pair_batches.append(reconstruction)
                         latents_non_pair_batches.append(latents)
                 reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
@@ -367,12 +396,17 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             @torch.no_grad()
             def __call__(self, module, input, output):
                 x = output
-                x2 = self._reconstruct_with_sae(x, path_for_latents=self.basedir_for_sae_latents)
+                x2 = self._reconstruct_with_sae(x, path_for_latents=self.basedir_for_sae_latents, make_intervention=False)
                 e = IterBlockOutput(*(x_elem - x2_elem for x_elem, x2_elem in zip(x, x2)))
-                x3 = self._reconstruct_with_sae(x, save_latents=False) # todo: blocking channels
+                x3 = self._reconstruct_with_sae(x, path_for_latents=None, make_intervention=True)
                 return IterBlockOutput(*(x3_elem + e_elem for x3_elem, e_elem in zip(x3, e)))
 
         sae_batch_size = self.sae_interventions["batch_size"]
+        intervention_indices_for_pair = torch.load(
+            self.sae_interventions.probes_indices_pair_path, weights_only=True) \
+            if self.sae_interventions.probes_indices_pair_path is not None else None
+        intervention_indices_for_non_pair = torch.load(self.sae_interventions.probes_indices_non_pair_path, weights_only=True) \
+            if self.sae_interventions.probes_indices_non_pair_path is not None else None
         return [
             self._register_hook_by_path(block_path, SAEInterventionHook(
                 Sae.load_from_disk(self.sae_interventions.sae_pair_path, self.device),
@@ -380,7 +414,10 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 sae_batch_size,
                 structure_id,
                 self.sae_interventions.sae_latents_base_dir,
-                timestep
+                timestep,
+                intervention_indices_for_pair,
+                intervention_indices_for_non_pair,
+                self.sae_interventions.intervention_multiplier
             ))
             for block_path in self.sae_interventions["blocks"]
         ]

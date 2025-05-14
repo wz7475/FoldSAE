@@ -5,3 +5,6 @@ sae_pair_path: sae-ckpts/picked/patch_topk_expansion_factor16_k32_multi_topkFals
 sae_non_pair_path: sae-ckpts/picked/patch_topk_expansion_factor16_k64_multi_topkFalse_auxk_alpha0.0lr0.0001_..activations_1200_block4_non_pair/block4_non_pair
 batch_size: 512
 sae_latents_base_dir: null
+intervention_indices_pair_path: regression/picked_channels/first_attempt/pair_top_10.pt
+intervention_indices_non_pair_path: regression/picked_channels/first_attempt/non_pair_top_10.pt
+intervention_multiplier: 3.0
