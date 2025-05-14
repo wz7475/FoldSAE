@@ -3,8 +3,7 @@ project: RFDiffSAE
 entity: RFDiffSAE
 name: probes
 
-
-program: universal-diffsae/notebooks/script.py
+program: universal-diffsae/src/scripts/train_probes.py
 
 command:
   - ${env}
