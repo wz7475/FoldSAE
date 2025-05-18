@@ -5,3 +5,5 @@ activation_datasets_debug
 localcolabfold
 outputs
 temp
+SAE_latents
+
