@@ -316,8 +316,8 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
                 self.structure_id = structure_id
                 self.timestep = timestep
                 self.intervention_multiplier = intervention_multiplier
-                self.intervention_indices_for_pair = intervention_indices_for_pair.to(self.device)
-                self.intervention_indices_for_non_pair = intervention_indices_for_non_pair.to(self.device)
+                self.intervention_indices_for_pair = intervention_indices_for_pair.to(self.device) if intervention_indices_for_pair is not None else None
+                self.intervention_indices_for_non_pair = intervention_indices_for_non_pair.to(self.device) if intervention_indices_for_non_pair is not None else None
                 self.intervention_multiplier = intervention_multiplier
 
             @staticmethod
@@ -403,10 +403,10 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
 
         sae_batch_size = self.sae_interventions["batch_size"]
         intervention_indices_for_pair = torch.load(
-            self.sae_interventions.probes_indices_pair_path, weights_only=True) \
-            if self.sae_interventions.probes_indices_pair_path is not None else None
-        intervention_indices_for_non_pair = torch.load(self.sae_interventions.probes_indices_non_pair_path, weights_only=True) \
-            if self.sae_interventions.probes_indices_non_pair_path is not None else None
+            self.sae_interventions.intervention_indices_pair_path, weights_only=True) \
+            if self.sae_interventions.intervention_indices_pair_path is not None else None
+        intervention_indices_for_non_pair = torch.load(self.sae_interventions.intervention_indices_non_pair_path, weights_only=True) \
+            if self.sae_interventions.intervention_indices_non_pair_path is not None else None
         return [
             self._register_hook_by_path(block_path, SAEInterventionHook(
                 Sae.load_from_disk(self.sae_interventions.sae_pair_path, self.device),
