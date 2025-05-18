@@ -17,9 +17,10 @@ num_designs=${1:-1}
 input_dir=${2:-./temp}
 final_step=${3:-49}
 probes_multiplier=${4:-3}
-cuda_idx_for_generation=${4:-0}
+sae_pair_path=${5:-./sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_pair/block4_pair}
+sae_non_pair_path=${6:-./sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_non_pair/block4_non_pair}
 PYTHON_RFDIFFUSION=${9:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
-PYTHON_PROTEINMPNN=${6:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
+PYTHON_PROTEINMPNN=${10:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 PYTHON_OPENSTRCUTERS=${7:-/home/wzarzecki/miniforge3/envs/openstruct/bin/python}
 PYTHON_BIOEMB=${8:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 
@@ -35,6 +36,8 @@ CUDA_VISIBLE_DEVICES=2 SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scri
  inference.num_designs="$num_designs" \
  inference.final_step="$final_step"  \
  saeinterventions=block4 \
+ saeinterventions.sae_pair_path=$sae_pair_path \
+ saeinterventions.sae_non_pair_path=$sae_non_pair_path \
  saeinterventions.probes_multiplier=$probes_multiplier;
 # keep only pdb
 rm "$structures_dir"/*.trb ;
