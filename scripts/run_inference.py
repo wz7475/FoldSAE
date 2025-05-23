@@ -24,7 +24,7 @@ from omegaconf import OmegaConf
 import hydra
 import logging
 
-from rfdiffusion.activations import save_activations_incrementally
+from rfdiffusion.activations import save_activations_incrementally, append_timestep_activations
 from rfdiffusion.util import writepdb_multi, writepdb
 from rfdiffusion.inference import utils as iu
 from hydra.core.hydra_config import HydraConfig
@@ -107,13 +107,7 @@ def main(conf: HydraConfig) -> None:
                 denoised_xyz_stack.append(x_t)
                 seq_stack.append(seq_t)
                 plddt_stack.append(plddt[0])  # remove singleton leading dimension
-                # if t % 1 == 0: # change to every n-th step from config
-                for key in activations_dict:
-                    if activations_per_design.get(key):
-                        activations_per_design[key][t] = activations_dict[key]
-                    else:
-                        activations_per_design[key] = {}
-                        activations_per_design[key][t] = activations_dict[key]
+                append_timestep_activations(activations_per_design, activations_dict, t, conf.activations.keep_every_n_timestep, conf.activations.keep_every_n_token)
         except np.linalg.LinAlgError as e:
             print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
             continue

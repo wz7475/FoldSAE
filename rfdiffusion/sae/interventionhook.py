@@ -59,18 +59,6 @@ class SAEInterventionHook:
             latents = self._update_sae_latents(latents, indices_to_modify, multiplier)
         return (latents @ sae.W_dec) + sae.b_dec, latents
 
-    def _save_latents_to_disk_as_hf_dataset(self, latents: torch.Tensor, subdir: str,
-                                            save_n_random: int | None = None
-                                            ):
-        if save_n_random:
-            indices = random.sample(range(latents.shape[0]), save_n_random)
-            latents = latents[indices]
-        path = os.path.join(self.basedir_for_sae_latents, subdir, f"{self.timestep}", self.structure_id)
-        os.makedirs(path, exist_ok=True)
-        Dataset.from_dict({
-            "values": latents
-        }).save_to_disk(path)
-        print(f"-- saved {latents.shape[0]} activations to {path} --")
 
     def _reconstruct_with_sae(
             self,
@@ -104,13 +92,6 @@ class SAEInterventionHook:
                 latents_non_pair_batches.append(latents)
         reconstructed_pair_tensor = torch.cat(reconstructed_pair_batches, dim=0)
         reconstructed_non_pair_tensor = torch.cat(reconstructed_non_pair_batches, dim=0)
-        if path_for_latents:  # if path for latents activations given, save path
-            latents_pair_tensor = torch.cat(latents_pair_batches, dim=0)
-            latents_non_pair_tensor = torch.cat(latents_non_pair_batches, dim=0)
-            num_tokens_to_save = latents_non_pair_tensor.shape[0] # ensure that for pair
-            # num of token is same as for non pair ie. num non pair = sqrt(num pair)
-            self._save_latents_to_disk_as_hf_dataset(latents_pair_tensor, "pair", save_n_random=num_tokens_to_save)
-            self._save_latents_to_disk_as_hf_dataset(latents_non_pair_tensor, "non_pair", save_n_random=num_tokens_to_save)
         return transform_to_iter_block_output(reconstructed_pair_tensor,
                                               reconstructed_non_pair_tensor)
 

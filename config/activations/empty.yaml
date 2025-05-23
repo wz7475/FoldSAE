@@ -1,2 +1,4 @@
 dataset_path: null
 map: null
+keep_every_n_timestep: 1
+keep_every_n_token: 1

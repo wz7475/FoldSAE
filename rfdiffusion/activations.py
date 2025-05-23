@@ -22,3 +22,16 @@ def save_activations_incrementally(activations_per_design, output_dir="activatio
             })
             ds_output_dir = os.path.join(output_dir, key, f"{timestep}")
             ds.save_to_disk(os.path.join(ds_output_dir, f"{uuid4()}"))
+
+
+def append_timestep_activations(activations_per_design: dict, timestep_activations: dict, timestep: int, keep_every_n_timestep: int = 1,
+        keep_every_n_token: int = 1):
+    if random.randint(0, keep_every_n_timestep - 1) == 0:
+        for key in timestep_activations:
+            tokens_to_save = len(timestep_activations[key]) // keep_every_n_token
+            reduced_activations = random.choices(timestep_activations[key], k=tokens_to_save)
+            if activations_per_design.get(key):
+                activations_per_design[key][timestep] = reduced_activations
+            else:
+                activations_per_design[key] = {}
+                activations_per_design[key][timestep] = reduced_activations
