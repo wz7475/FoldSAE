@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
-from rfdiffusion.RoseTTAFoldModel import RoseTTAFoldModule, HookedRoseTTAFoldModule
+from rfdiffusion.RoseTTAFoldModel import RoseTTAFoldModule
+from rfdiffusion.HookedRoseTTAFoldModel import HookedRoseTTAFoldModule
 from rfdiffusion.kinematics import get_init_xyz, xyz_to_t2d
 from rfdiffusion.diffusion import Diffuser
 from rfdiffusion.chemical import seq2chars
