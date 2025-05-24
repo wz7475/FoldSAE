@@ -1,8 +1,4 @@
-import os
-import random
-
 import torch
-from datasets import Dataset
 from torch.utils.data import DataLoader, TensorDataset
 
 from rfdiffusion.Track_module import IterBlockOutput
@@ -12,13 +8,10 @@ from rfdiffusion.sae.universalsae import Sae
 
 class SAEInterventionHook:
     def __init__(self, sae_for_pair: Sae, sae_for_non_pair: Sae, batch_size: int = 512,
-                 structure_id: None | str = None, basedir_for_sae_latents: None | str = None,
-                 timestep: None | int = None,
                  intervention_indices_for_pair: torch.Tensor | str = None,
                  intervention_indices_for_non_pair: torch.Tensor | str = None,
                  intervention_multiplier: float | None = None,
                  ):
-        self.basedir_for_sae_latents = basedir_for_sae_latents
         if torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
@@ -28,8 +21,6 @@ class SAEInterventionHook:
         self.batch_size = batch_size
         self.sae_for_pair.eval()
         self.sae_for_non_pair.eval()
-        self.structure_id = structure_id
-        self.timestep = timestep
         self.intervention_multiplier = intervention_multiplier
         self.intervention_indices_for_pair = intervention_indices_for_pair.to(
             self.device) if intervention_indices_for_pair is not None else None
@@ -62,7 +53,7 @@ class SAEInterventionHook:
 
     def _reconstruct_with_sae(
             self,
-            output, path_for_latents: str | None,
+            output,
             make_intervention: bool | None = None,
     ):
         pairs, non_pairs = transform_from_iter_block_output(output)
@@ -98,7 +89,7 @@ class SAEInterventionHook:
     @torch.no_grad()
     def __call__(self, module, input, output):
         x = output
-        x2 = self._reconstruct_with_sae(x, path_for_latents=self.basedir_for_sae_latents, make_intervention=False)
+        x2 = self._reconstruct_with_sae(x, make_intervention=False)
         e = IterBlockOutput(*(x_elem - x2_elem for x_elem, x2_elem in zip(x, x2)))
-        x3 = self._reconstruct_with_sae(x, path_for_latents=None, make_intervention=True)
+        x3 = self._reconstruct_with_sae(x, make_intervention=True)
         return IterBlockOutput(*(x3_elem + e_elem for x3_elem, e_elem in zip(x3, e)))

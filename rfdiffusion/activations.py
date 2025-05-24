@@ -5,7 +5,7 @@ from uuid import uuid4
 from datasets import Dataset
 
 
-def save_activations_incrementally(activations_per_design, output_dir="activation_datasets"):
+def save_activations_incrementally(activations_per_design, output_dir, structure_id: str):
     """
     Save activations for a single design incrementally. Adds random identifier not to other write design with same
     index.
@@ -21,7 +21,7 @@ def save_activations_incrementally(activations_per_design, output_dir="activatio
                 "values": activations_per_timestep
             })
             ds_output_dir = os.path.join(output_dir, key, f"{timestep}")
-            ds.save_to_disk(os.path.join(ds_output_dir, f"{uuid4()}"))
+            ds.save_to_disk(os.path.join(ds_output_dir, structure_id))
 
 
 def append_timestep_activations(activations_per_design: dict, timestep_activations: dict, timestep: int, keep_every_n_timestep: int = 1,
