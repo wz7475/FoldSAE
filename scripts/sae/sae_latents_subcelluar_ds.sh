@@ -1,4 +1,4 @@
-#!usr/bin/env bash
+#!/usr/bin/env bash
 
 input_dir=$1
 num_of_structures=$2
@@ -14,6 +14,7 @@ dir_for_latents="$input_dir/latents"
 dir_for_activations="$input_dir/activations"
 dir_for_structures="$input_dir/structures"
 classifiers_file="$input_dir/classifiers.csv"
+dir_for_ovo_datasets="$input_dir/ovo_datasets"
 
 # 1) generate structures and save RFDiffusion activations
 echo "generation of structures ..." ;
@@ -55,6 +56,14 @@ CUDA_VISIBLE_DEVICES="$DEVICE_IDX_FOR_OLD_GPU" CUDA_VISIBLE_DEVICES=2 bash scrip
 echo "adding labels to HF datasets ..."
 $PYTHON_RFDIFFUSION scripts/sae/update_sae_latents_dataset.py \
 	--base-dir $input_dir
+
+# 6) prepare specific datasets
+for sae_type in "pair" "non_pair"; do
+  $PYTHON_SAE universal-diffsae/src/scripts/prepare_and_merge_latents_ds.py \
+    --dataset_shards_path "$dir_for_latents" \
+    --output_datasets_dir "$dir_for_ovo_datasets/$sae_type" \
+    --sae_type "$sae_type"
+done
 
 echo "Done."
 
