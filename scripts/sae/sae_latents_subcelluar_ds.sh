@@ -14,15 +14,16 @@ dir_for_latents="$input_dir/latents"
 dir_for_activations="$input_dir/activations"
 dir_for_structures="$input_dir/structures"
 classifiers_file="$input_dir/classifiers.csv"
-dir_for_ovo_datasets="$input_dir/ovo_datasets"
+dir_for_ovr_datasets="$input_dir/ovr_datasets"
+dir_for_ovr_datasets_per_timestep="$input_dir/ovr_datasets_per_timestep"
 
 # 1) generate structures and save RFDiffusion activations
 echo "generation of structures ..." ;
 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
-    inference.output_prefix="$dir_for_structures/xxx" \
-    'contigmap.contigs=[100-200]' \
-    inference.num_designs=$num_of_structures \
-    inference.final_step=1 \
+   inference.output_prefix="$dir_for_structures/xxx" \
+   'contigmap.contigs=[100-200]' \
+   inference.num_designs=$num_of_structures \
+   inference.final_step=1 \
 		activations=block4 \
 		activations.dataset_path=$dir_for_activations \
 		activations.keep_every_n_timestep=10 \
@@ -41,28 +42,35 @@ echo "used sae: $sae_pair_path\n $sae_non_pair_path" > "$input_dir/sae_paths.txt
 echo "inverse-folding to sequences ..."
 sequences_dir="$input_dir/seqs"
 CUDA_VISIBLE_DEVICES="$DEVICE_IDX_FOR_OLD_GPU" bash scripts/protein-struct-pipe/protein_mpnn/run_inverse_folding.sh \
-    $dir_for_structures \
-    $input_dir \
-    "$PYTHON_PROTEINMPNN"
+   $dir_for_structures \
+   $input_dir \
+   "$PYTHON_PROTEINMPNN"
 
 # 4) running bio_embeddings classifiers
 echo "running bio_embeddings classifiers ..."
 CUDA_VISIBLE_DEVICES="$DEVICE_IDX_FOR_OLD_GPU" CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/bio_emb/run_classifiers.sh \
-  $sequences_dir \
-  $classifiers_file \
-  $PYTHON_BIOEMB
+ $sequences_dir \
+ $classifiers_file \
+ $PYTHON_BIOEMB
 
 # 5 "update datasets with labels from classifiers"
 echo "adding labels to HF datasets ..."
 $PYTHON_RFDIFFUSION scripts/sae/update_sae_latents_dataset.py \
-	--base-dir $input_dir
+#	--base-dir $input_dir
 
 # 6) prepare specific datasets
 for sae_type in "pair" "non_pair"; do
+ $PYTHON_SAE universal-diffsae/src/scripts/prepare_and_merge_latents_ds.py \
+   --dataset_shards_path "$input_dir" \
+   --output_datasets_dir "$dir_for_ovr_datasets/$sae_type" \
+   --sae_type "$sae_type"
+done
+for sae_type in "pair" "non_pair"; do
   $PYTHON_SAE universal-diffsae/src/scripts/prepare_and_merge_latents_ds.py \
-    --dataset_shards_path "$dir_for_latents" \
-    --output_datasets_dir "$dir_for_ovo_datasets/$sae_type" \
-    --sae_type "$sae_type"
+    --dataset_shards_path "$input_dir" \
+    --output_datasets_dir "$dir_for_ovr_datasets/$sae_type" \
+    --sae_type "$sae_type" \
+    --ds_per_timestep
 done
 
 echo "Done."
