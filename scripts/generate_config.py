@@ -79,14 +79,16 @@ def get_dict_timestep_sae_hook_conf(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit_timestep", type=int, default=30)
+    parser.add_argument("--multiplier", type=float, default=-1.0)
     args = parser.parse_args()
     limit_timestep = args.limit_timestep
+    multiplier = args.multiplier
 
     saes_conf = get_dict_timestep_sae_hook_conf(
             "/home/wzarzecki/ds_sae_latents_1600x/indices",
             "Cytoplasm",
-            list(range(1, limit_timestep + 1)),
-            -1,
+            list(range(2, limit_timestep + 1)),
+            multiplier,
             intervention_on_pair_sae=False,
             intervention_on_non_pair_sae=True,
     )

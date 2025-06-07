@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -15,8 +17,8 @@ class SAEInterventionHook:
         sae_pair_path: str | None,
         sae_non_pair_path: str | None,
         batch_size: int = 512,
-        intervention_indices_for_pair: torch.Tensor | str = None,
-        intervention_indices_for_non_pair: torch.Tensor | str = None,
+        intervention_indices_for_pair: Tuple[torch.Tensor] | str = None,
+        intervention_indices_for_non_pair: Tuple[torch.Tensor] | str = None,
         intervention_multiplier: float | None = None,
     ):
         if torch.cuda.is_available():
@@ -39,7 +41,7 @@ class SAEInterventionHook:
             torch.load(
                 intervention_indices_for_pair,
                 weights_only=True,
-            ).to(self.device)
+            )
             if intervention_indices_for_pair is not None
             else None
         )
@@ -47,24 +49,27 @@ class SAEInterventionHook:
             torch.load(
                 intervention_indices_for_non_pair,
                 weights_only=True,
-            ).to(self.device)
+            )
             if intervention_indices_for_non_pair is not None
             else None
         )
         self.intervention_multiplier = intervention_multiplier
 
-    @staticmethod
     def _update_sae_latents(
-        latents: torch.Tensor, indices: torch.Tensor, multiplier: int
+        self,
+        latents: torch.Tensor, indices: Tuple[torch.Tensor], multiplier: int
     ) -> torch.Tensor:
-        latents[:, indices] *= multiplier
-        return latents
+        mask = torch.ones_like(latents)
+        coefs_values, indices = indices[0].to(self.device), indices[1].to(self.device)
+        for idx, val in zip(indices, coefs_values):
+            mask[:, idx] = val * multiplier
+        return latents * mask
 
     def _reconstruct_batch_with_sae(
         self,
         sae: Sae,
         batch: list[torch.Tensor],
-        indices_to_modify: torch.Tensor | None = None,
+        indices_to_modify: Tuple[torch.Tensor] | None = None,
         multiplier: int | None = None,
     ):
         batch = batch[0].to(self.device)

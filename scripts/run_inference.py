@@ -110,7 +110,6 @@ def main(conf: HydraConfig) -> None:
                 append_timestep_activations(activations_per_design, activations_dict, t, conf.activations.keep_every_n_timestep, conf.activations.keep_every_n_token)
         except np.linalg.LinAlgError as e:
             print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
-            raise e
             continue
         except Exception as e:
             print(f"exception {e}")
