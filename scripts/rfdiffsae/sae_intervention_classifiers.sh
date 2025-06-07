@@ -29,16 +29,15 @@ PYTHON_BIOEMB=${8:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 # 1)
 echo "generation of structures ..." ;
 structures_dir="$input_dir/pdb" ;
+# generate config
+$PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --limit_timestep 49 --multiplier $probes_multiplier ;
 # generate structure by RfDiffusion with SAE intervention
 CUDA_VISIBLE_DEVICES=2 SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
 	inference.output_prefix="$structures_dir/" \
  'contigmap.contigs=[100-200]' \
  inference.num_designs="$num_designs" \
  inference.final_step="$final_step"  \
- saeinterventions=block4 \
- saeinterventions.sae_pair_path=$sae_pair_path \
- saeinterventions.sae_non_pair_path=$sae_non_pair_path \
- saeinterventions.probes_multiplier=$probes_multiplier;
+ saeinterventions=block4
 # keep only pdb
 rm "$structures_dir"/*.trb ;
 
@@ -61,3 +60,30 @@ CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/bio_emb/run_classifiers.
 # 4) make plot
 plot_file="$input_dir/subcellular.png"
 $PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -o $plot_file -k $probes_multiplier
+
+# 5)
+# new structures from sequences with AlphaFold2
+# echo "new structures from sequences with AlphaFold2 ..."
+# af2_dir="$input_dir/af2"
+# CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/colabfold/run_colabfold.sh \
+#   $sequences_dir \
+#   $af2_dir
+
+# # 6)
+# # comparison of RFDiff and AF2 structures
+# echo "comparison of RFDiff and AF2 structures ..."
+# results_file=$input_dir/structure_evaluation.csv
+# CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/openstructures/evaluate_structures.sh \
+#   $structures_dir \
+#   $af2_dir \
+#   $results_file \
+#   "$PYTHON_OPENSTRCUTERS"
+# echo "saved metrics to $results_file"
+
+# # 7)
+# echo "structure quality plots ..."
+# plot_file_quality="$input_dir/strcuture_quality.png"
+# $PYTHON_BIOEMB /data/wzarzecki/SAEtoRuleRFDiffusion/scripts/plots/structure_quality_single_file.py \
+#   /data/wzarzecki/sae_interventions/sae_30_04_10x/structure_evaluation.csv \
+#   $plot_file_quality \
+#   --title $probes_multiplier

@@ -68,7 +68,7 @@ done
 for sae_type in "pair" "non_pair"; do
   $PYTHON_SAE universal-diffsae/src/scripts/prepare_and_merge_latents_ds.py \
     --dataset_shards_path "$input_dir" \
-    --output_datasets_dir "$dir_for_ovr_datasets/$sae_type" \
+    --output_datasets_dir "$dir_for_ovr_datasets_per_timestep/$sae_type" \
     --sae_type "$sae_type" \
     --ds_per_timestep
 done
