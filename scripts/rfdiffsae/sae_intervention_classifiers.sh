@@ -16,7 +16,7 @@
 num_designs=${1:-1}
 input_dir=${2:-./temp}
 final_step=${3:-49}
-probes_multiplier=${4:-3}
+probes_lambda_=${4:-3}
 lowest_timestep=${5:-2}
 highest_timestep=${6:-2}
 cuda_idx=${7:-1}
@@ -30,11 +30,11 @@ echo "running on cuda: ${cuda_idx}"
 echo "generation of structures ..." ;
 structures_dir="$input_dir/pdb" ;
 # generate config
-config_name_no_ext="${lowest_timestep}_${highest_timestep}_${probes_multiplier}"
+config_name_no_ext="${lowest_timestep}_${highest_timestep}_${probes_lambda_}"
 config_name_with_ext="${config_name_no_ext}.yaml"
 $PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --lowest_timestep $lowest_timestep \
   --highest_timestep $highest_timestep \
-  --multiplier $probes_multiplier \
+  --lambda_ $probes_lambda_ \
   --output_config_name $config_name_with_ext;
 # generate structure by RfDiffusion with SAE intervention
 CUDA_VISIBLE_DEVICES="${cuda_idx}" SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
@@ -65,7 +65,7 @@ CUDA_VISIBLE_DEVICES="${cuda_idx}" bash scripts/protein-struct-pipe/bio_emb/run_
 
 # 4) make plot
 plot_file="$input_dir/subcellular.png"
-$PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -o $plot_file -k $probes_multiplier
+$PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -o $plot_file -k $probes_lambda_
 
 # 5)
 # new structures from sequences with AlphaFold2
@@ -92,4 +92,4 @@ $PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -
 # $PYTHON_BIOEMB /data/wzarzecki/SAEtoRuleRFDiffusion/scripts/plots/structure_quality_single_file.py \
 #   /data/wzarzecki/sae_interventions/sae_30_04_10x/structure_evaluation.csv \
 #   $plot_file_quality \
-#   --title $probes_multiplier
+#   --title $probes_lambda_
