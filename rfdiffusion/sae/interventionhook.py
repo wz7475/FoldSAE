@@ -19,7 +19,7 @@ class SAEInterventionHook:
         batch_size: int = 512,
         intervention_indices_for_pair: Tuple[torch.Tensor] | str = None,
         intervention_indices_for_non_pair: Tuple[torch.Tensor] | str = None,
-        intervention_multiplier: float | None = None,
+        intervention_lambda_: float | None = None,
     ):
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -36,7 +36,7 @@ class SAEInterventionHook:
             self.sae_for_pair.eval()
         if self.sae_for_non_pair:
             self.sae_for_non_pair.eval()
-        self.intervention_multiplier = intervention_multiplier
+        self.intervention_lambda_ = intervention_lambda_
         self.intervention_indices_for_pair = (
             torch.load(
                 intervention_indices_for_pair,
@@ -53,24 +53,24 @@ class SAEInterventionHook:
             if intervention_indices_for_non_pair is not None
             else None
         )
-        self.intervention_multiplier = intervention_multiplier
+        self.intervention_lambda_ = intervention_lambda_
 
     def _update_sae_latents(
         self,
-        latents: torch.Tensor, indices: Tuple[torch.Tensor], multiplier: int
+        latents: torch.Tensor, indices: Tuple[torch.Tensor, torch.Tensor], lambda_: int
     ) -> torch.Tensor:
         mask = torch.ones_like(latents)
         coefs_values, indices = indices[0].to(self.device), indices[1].to(self.device)
         for idx, val in zip(indices, coefs_values):
-            mask[:, idx] = val * multiplier
+            mask[:, idx] = val * lambda_ + 1
         return latents * mask
 
     def _reconstruct_batch_with_sae(
         self,
         sae: Sae,
         batch: list[torch.Tensor],
-        indices_to_modify: Tuple[torch.Tensor] | None = None,
-        multiplier: int | None = None,
+        indices_to_modify: Tuple[torch.Tensor, torch.Tensor] | None = None,
+        lambda_: int | None = None,
     ):
         batch = batch[0].to(self.device)
         sae_input, _, _ = sae.preprocess_input(batch.unsqueeze(1))
@@ -78,8 +78,8 @@ class SAEInterventionHook:
         top_acts, top_indices = sae.select_topk(pre_acts)
         buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
         latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-        if indices_to_modify is not None and multiplier is not None:
-            latents = self._update_sae_latents(latents, indices_to_modify, multiplier)
+        if indices_to_modify is not None and lambda_ is not None:
+            latents = self._update_sae_latents(latents, indices_to_modify, lambda_)
             print("updated latents")
         else:
             print("not updated latens")
@@ -102,11 +102,11 @@ class SAEInterventionHook:
         if make_intervention:
             probes_pair_indices = self.intervention_indices_for_pair
             probes_non_pair_indices = self.intervention_indices_for_non_pair
-            intervention_multiplier = self.intervention_multiplier
+            intervention_lambda_ = self.intervention_lambda_
         else:
             probes_pair_indices = None
             probes_non_pair_indices = None
-            intervention_multiplier = None
+            intervention_lambda_ = None
         with torch.no_grad():
             if self.sae_for_pair:
                 for batch in pairs_dataloader:
@@ -114,7 +114,7 @@ class SAEInterventionHook:
                         self.sae_for_pair,
                         batch,
                         probes_pair_indices,
-                        intervention_multiplier,
+                        intervention_lambda_,
                     )
                     reconstructed_pair_batches.append(reconstruction)
                     latents_pair_batches.append(latents)
@@ -127,7 +127,7 @@ class SAEInterventionHook:
                         self.sae_for_non_pair,
                         batch,
                         probes_non_pair_indices,
-                        intervention_multiplier,
+                        intervention_lambda_,
                     )
                     reconstructed_non_pair_batches.append(reconstruction)
                     latents_non_pair_batches.append(latents)

@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 
 
 def get_sae_conf_dict(
-    sae_multiplier: float,
+    sae_lambda_: float,
     non_pair_indices_path: str | None,
     pair_indices_path: str | None = None,
 ) -> dict | None:
@@ -25,7 +25,7 @@ def get_sae_conf_dict(
         "batch_size": batch_size,
         "intervention_indices_for_pair": pair_indices_path,
         "intervention_indices_for_non_pair": non_pair_indices_path,
-        "intervention_multiplier": sae_multiplier,
+        "intervention_lambda_": sae_lambda_,
     }
 
 
@@ -45,7 +45,7 @@ def get_dict_timestep_sae_hook_conf(
     indices_tensors_dir: str,
     label: str,
     timesteps: list[int],
-    intervention_multiplier: float,
+    intervention_lambda_: float,
     intervention_on_pair_sae: bool,
     intervention_on_non_pair_sae: bool,
 ) -> dict[int, dict | None]:
@@ -74,7 +74,7 @@ def get_dict_timestep_sae_hook_conf(
         else:
             non_pair_indices_path = None
         conf[timestep] = get_sae_conf_dict(
-            intervention_multiplier,
+            intervention_lambda_,
             non_pair_indices_path,
             pair_indices_path,
         )
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--highest_timestep", type=int, default=30)
     parser.add_argument("--lowest_timestep", type=int, default=2)
-    parser.add_argument("--multiplier", type=float, default=-1.0)
+    parser.add_argument("--lambda_", type=float, default=-1.0)
     parser.add_argument("--output_config_name", type=str, default="block4.yaml")
     args = parser.parse_args()
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         "/home/wzarzecki/ds_sae_latents_1600x/indices",
         "Cytoplasm",
         list(range(args.lowest_timestep, args.highest_timestep + 1)),
-        args.multiplier,
+        args.lambda_,
         intervention_on_pair_sae=False,
         intervention_on_non_pair_sae=True,
     )
