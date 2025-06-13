@@ -17,34 +17,40 @@ num_designs=${1:-1}
 input_dir=${2:-./temp}
 final_step=${3:-49}
 probes_multiplier=${4:-3}
-sae_pair_path=${5:-./sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_pair/block4_pair}
-sae_non_pair_path=${6:-./sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_non_pair/block4_non_pair}
-PYTHON_RFDIFFUSION=${9:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
-PYTHON_PROTEINMPNN=${10:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
+lowest_timestep=${5:-2}
+highest_timestep=${6:-2}
+cuda_idx=${7:-1}
 PYTHON_OPENSTRCUTERS=${7:-/home/wzarzecki/miniforge3/envs/openstruct/bin/python}
 PYTHON_BIOEMB=${8:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
-
-
+PYTHON_RFDIFFUSION=${9:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
+PYTHON_PROTEINMPNN=${10:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 
 # 1)
+echo "running on cuda: ${cuda_idx}"
 echo "generation of structures ..." ;
 structures_dir="$input_dir/pdb" ;
 # generate config
-$PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --limit_timestep 49 --multiplier $probes_multiplier ;
+config_name_no_ext="${lowest_timestep}_${highest_timestep}_${probes_multiplier}"
+config_name_with_ext="${config_name_no_ext}.yaml"
+$PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --lowest_timestep $lowest_timestep \
+  --highest_timestep $highest_timestep \
+  --multiplier $probes_multiplier \
+  --output_config_name $config_name_with_ext;
 # generate structure by RfDiffusion with SAE intervention
-CUDA_VISIBLE_DEVICES=2 SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
+CUDA_VISIBLE_DEVICES="${cuda_idx}" SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
 	inference.output_prefix="$structures_dir/" \
  'contigmap.contigs=[100-200]' \
  inference.num_designs="$num_designs" \
  inference.final_step="$final_step"  \
- saeinterventions=block4
+ saeinterventions="$config_name_no_ext" \
+ inference.seed=0
 # keep only pdb
 rm "$structures_dir"/*.trb ;
 
 # 2)
 # inverse-folding with protein-mpnn sequences from structures - 1 sequence per 1 structure (checkout run_inverse_folding.sh)
 echo "inverse-folding to sequences ..."
-CUDA_VISIBLE_DEVICES=2 bash ./scripts/protein-struct-pipe/protein_mpnn/run_inverse_folding.sh "$structures_dir"  \
+CUDA_VISIBLE_DEVICES="${cuda_idx}" bash ./scripts/protein-struct-pipe/protein_mpnn/run_inverse_folding.sh "$structures_dir"  \
   "$input_dir" "$PYTHON_PROTEINMPNN" ;
 # this script^^^ saves that to dir_given_as_second_arg/seqs
 sequences_dir="$input_dir/seqs"
@@ -52,7 +58,7 @@ sequences_dir="$input_dir/seqs"
 # 3)
 echo "running bio_embeddings classifiers"
 classifiers_file="$input_dir/classifiers.csv"
-CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/bio_emb/run_classifiers.sh \
+CUDA_VISIBLE_DEVICES="${cuda_idx}" bash scripts/protein-struct-pipe/bio_emb/run_classifiers.sh \
   $sequences_dir \
   $classifiers_file \
   $PYTHON_BIOEMB
@@ -65,7 +71,7 @@ $PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -
 # new structures from sequences with AlphaFold2
 # echo "new structures from sequences with AlphaFold2 ..."
 # af2_dir="$input_dir/af2"
-# CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/colabfold/run_colabfold.sh \
+# CUDA_VISIBLE_DEVICES="${cuda_idx bash scripts/protein-struct-pipe/colabfold/run_colabfold.sh \
 #   $sequences_dir \
 #   $af2_dir
 
@@ -73,7 +79,7 @@ $PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -
 # # comparison of RFDiff and AF2 structures
 # echo "comparison of RFDiff and AF2 structures ..."
 # results_file=$input_dir/structure_evaluation.csv
-# CUDA_VISIBLE_DEVICES=2 bash scripts/protein-struct-pipe/openstructures/evaluate_structures.sh \
+# CUDA_VISIBLE_DEVICES="${cuda_idx bash scripts/protein-struct-pipe/openstructures/evaluate_structures.sh \
 #   $structures_dir \
 #   $af2_dir \
 #   $results_file \
