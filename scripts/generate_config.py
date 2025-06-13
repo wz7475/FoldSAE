@@ -19,7 +19,9 @@ def get_sae_conf_dict(
     return {
         "_target_": sae_hook_class_path,
         "sae_pair_path": sae_pair_weights_path if pair_indices_path else None,
-        "sae_non_pair_path": sae_non_pair_weights_path if non_pair_indices_path else None,
+        "sae_non_pair_path": (
+            sae_non_pair_weights_path if non_pair_indices_path else None
+        ),
         "batch_size": batch_size,
         "intervention_indices_for_pair": pair_indices_path,
         "intervention_indices_for_non_pair": non_pair_indices_path,
@@ -72,25 +74,28 @@ def get_dict_timestep_sae_hook_conf(
         else:
             non_pair_indices_path = None
         conf[timestep] = get_sae_conf_dict(
-            intervention_multiplier, non_pair_indices_path, pair_indices_path
+            intervention_multiplier,
+            non_pair_indices_path,
+            pair_indices_path,
         )
     return conf
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit_timestep", type=int, default=30)
+    parser.add_argument("--highest_timestep", type=int, default=30)
+    parser.add_argument("--lowest_timestep", type=int, default=2)
     parser.add_argument("--multiplier", type=float, default=-1.0)
+    parser.add_argument("--output_config_name", type=str, default="block4.yaml")
     args = parser.parse_args()
-    limit_timestep = args.limit_timestep
-    multiplier = args.multiplier
 
     saes_conf = get_dict_timestep_sae_hook_conf(
-            "/home/wzarzecki/ds_sae_latents_1600x/indices",
-            "Cytoplasm",
-            list(range(2, limit_timestep + 1)),
-            multiplier,
-            intervention_on_pair_sae=False,
-            intervention_on_non_pair_sae=True,
+        "/home/wzarzecki/ds_sae_latents_1600x/indices",
+        "Cytoplasm",
+        list(range(args.lowest_timestep, args.highest_timestep + 1)),
+        args.multiplier,
+        intervention_on_pair_sae=False,
+        intervention_on_non_pair_sae=True,
     )
     conf_manual = {
         "block": "simulator.main_block.4",
@@ -100,12 +105,6 @@ if __name__ == "__main__":
     conf = OmegaConf.create(conf_manual)
     conf_yaml = OmegaConf.to_yaml(conf)
 
-    conf_path = "RFDiffSAE/config/saeinterventions/block4.yaml"
+    conf_path =  os.path.join("RFDiffSAE/config/saeinterventions/", args.output_config_name)
     with open(conf_path, "w") as f:
         f.write(conf_yaml)
-
-    # saes = {
-    #     name: instantiate(instance_conf) if instance_conf else None
-    #     for name, instance_conf in conf.saes.items()
-    # }
-    # print(saes)

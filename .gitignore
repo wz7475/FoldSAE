@@ -26,3 +26,4 @@ merged_activation_dataset
 lightning_logs
 csv_logs
 activations_*
+config
