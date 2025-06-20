@@ -19,24 +19,29 @@ final_step=${3:-49}
 probes_lambda_=${4:-3}
 lowest_timestep=${5:-2}
 highest_timestep=${6:-2}
-cuda_idx=${7:-1}
-PYTHON_OPENSTRCUTERS=${7:-/home/wzarzecki/miniforge3/envs/openstruct/bin/python}
-PYTHON_BIOEMB=${8:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
+label=${7:-"Cytoplasm"}
+cuda_idx=${8:-1}
 PYTHON_RFDIFFUSION=${9:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
 PYTHON_PROTEINMPNN=${10:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
+PYTHON_OPENSTRCUTERS=${11:-/home/wzarzecki/miniforge3/envs/openstruct/bin/python}
+PYTHON_BIOEMB=${12:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 
 # 1)
 echo "running on cuda: ${cuda_idx}"
-echo "generation of structures ..." ;
+
 structures_dir="$input_dir/pdb" ;
 # generate config
-config_name_no_ext="${lowest_timestep}_${highest_timestep}_${probes_lambda_}"
+config_name_no_ext="conf_${lowest_timestep}_${highest_timestep}_${probes_lambda_}"
+# config_name_no_ext="temp-.-for-.-testing"
 config_name_with_ext="${config_name_no_ext}.yaml"
 $PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --lowest_timestep $lowest_timestep \
   --highest_timestep $highest_timestep \
   --lambda_ $probes_lambda_ \
-  --output_config_name $config_name_with_ext;
+  --output_config_name $config_name_with_ext \
+  --label "${label}" ;
+echo "generated config for RF $label lambda $probes_lambda_ range of timestep $highest_timestep  $lowest_timestep" ;
 # generate structure by RfDiffusion with SAE intervention
+echo "generation of structures ..." ;
 CUDA_VISIBLE_DEVICES="${cuda_idx}" SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
 	inference.output_prefix="$structures_dir/" \
  'contigmap.contigs=[100-200]' \

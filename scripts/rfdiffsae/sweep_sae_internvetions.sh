@@ -6,17 +6,20 @@ step=${3:-0.05}
 lowest_timestep=${4:-2}
 highest_timestep=${5:-2}
 num_designs=${6:-50}
-cuda_idx=${7:-1}
+label=${7:-"Cytoplasm"}
+cuda_idx=${8:-1}
+dir_name=${9:-"sign_as_base"}
 
 current=$start
 
 while (( $(echo "$current < $stop" | bc -l) )); do
   bash scripts/rfdiffsae/sae_intervention_classifiers.sh $num_designs \
-  "/home/wzarzecki/sae_interventions/coefs_as_base/${num_designs}_${lowest_timestep}_${highest_timestep}_${current}" \
+  "/home/wzarzecki/sae_interventions/$dir_name/${num_designs}_${lowest_timestep}_${highest_timestep}_${current}" \
   1 \
   $current \
   $lowest_timestep \
   $highest_timestep \
+  $label \
   $cuda_idx ;
   current=$(echo "$current + $step" | bc) ;
 done
