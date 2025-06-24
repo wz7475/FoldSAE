@@ -4,10 +4,7 @@ pdb_dir="$1"
 output_dir="$2"
 PYTHON_EXEC=${3:-/home/wzarzecki/miniforge3/envs/uncond38/bin/python}
 
-if [ ! -d $output_dir ]
-then
-    mkdir -p $output_dir
-fi
+mkdir -p $output_dir ;
 
 for pdb_file in $pdb_dir/*.pdb;
 do
@@ -21,6 +18,7 @@ do
             --batch_size 1
 done
 
+
 for file in $output_dir/seqs/*.fa; do
   id=$(basename "$file" .fa)
   tmpfile=$(mktemp)
@@ -29,8 +27,10 @@ for file in $output_dir/seqs/*.fa; do
   sed -n '3,4p' "$file" | sed "1s/.*/>$id/" > "$tmpfile"
 
   # Move and rename the processed file
-  mv "$tmpfile" "$output_dir/seqs/$id.fa"
+  mv "$tmpfile" "$output_dir/$id.fa"
 
-  [ "$file" != "$output_dir/seqs/$id.fa" ] && rm -f "$file"
+  [ "$file" != "$output_dir/$id.fa" ] && rm -f "$file"
 
 done
+
+rm "$output_dir/seqs" -r

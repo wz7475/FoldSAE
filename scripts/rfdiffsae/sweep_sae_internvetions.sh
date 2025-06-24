@@ -9,6 +9,8 @@ num_designs=${6:-50}
 label=${7:-"Cytoplasm"}
 cuda_idx=${8:-1}
 dir_name=${9:-"sign_as_base"}
+num_of_coefs=${10:-10}
+coefs_src_dir=${11:-"/home/wzarzecki/ds_sae_latents_1600x/coefs/non_pair"}
 
 current=$start
 
@@ -20,6 +22,8 @@ while (( $(echo "$current < $stop" | bc -l) )); do
   $lowest_timestep \
   $highest_timestep \
   $label \
-  $cuda_idx ;
+  $cuda_idx \
+  $num_of_coefs \
+  $coefs_src_dir ;
   current=$(echo "$current + $step" | bc) ;
 done
