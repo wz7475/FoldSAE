@@ -25,7 +25,7 @@ def get_sae_conf_dict(
         "batch_size": batch_size,
         "intervention_indices_for_pair": pair_indices_path,
         "intervention_indices_for_non_pair": non_pair_indices_path,
-        "intervention_lambda_": sae_lambda_,
+        "intervention_lambda": sae_lambda_,
     }
 
 
@@ -87,11 +87,13 @@ if __name__ == "__main__":
     parser.add_argument("--lowest_timestep", type=int, default=2)
     parser.add_argument("--lambda_", type=float, default=-1.0)
     parser.add_argument("--output_config_name", type=str, default="block4.yaml")
+    parser.add_argument("--base_dir", default="/home/wzarzecki/ds_sae_latents_1600x/indices")
+    parser.add_argument("--label", default="Cytoplasm")
     args = parser.parse_args()
 
     saes_conf = get_dict_timestep_sae_hook_conf(
-        "/home/wzarzecki/ds_sae_latents_1600x/indices",
-        "Cytoplasm",
+        args.base_dir,
+        args.label,
         list(range(args.lowest_timestep, args.highest_timestep + 1)),
         args.lambda_,
         intervention_on_pair_sae=False,

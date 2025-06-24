@@ -19,7 +19,7 @@ class SAEInterventionHook:
         batch_size: int = 512,
         intervention_indices_for_pair: Tuple[torch.Tensor] | str = None,
         intervention_indices_for_non_pair: Tuple[torch.Tensor] | str = None,
-        intervention_lambda_: float | None = None,
+        intervention_lambda: float | None = None,
     ):
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -36,7 +36,7 @@ class SAEInterventionHook:
             self.sae_for_pair.eval()
         if self.sae_for_non_pair:
             self.sae_for_non_pair.eval()
-        self.intervention_lambda_ = intervention_lambda_
+        self.intervention_lambda_ = intervention_lambda
         self.intervention_indices_for_pair = (
             torch.load(
                 intervention_indices_for_pair,
@@ -53,7 +53,7 @@ class SAEInterventionHook:
             if intervention_indices_for_non_pair is not None
             else None
         )
-        self.intervention_lambda_ = intervention_lambda_
+        self.intervention_lambda_ = intervention_lambda
 
     def _update_sae_latents(
         self,
