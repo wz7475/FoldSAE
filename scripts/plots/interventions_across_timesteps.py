@@ -1,7 +1,6 @@
 import argparse
 import os
 import re
-
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -14,44 +13,67 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_dir", type=str, required=True)
     parser.add_argument("--output_png", type=str, required=True)
-    parser.add_argument("--dir_prefixes", nargs="+", type=str, default=["k_15", "k_45"])
+    parser.add_argument("--dir_prefixes", nargs="+", type=str, default=["2_1_50"])
     parser.add_argument("--label", type=str, default="Cytoplasm")
     parser.add_argument("--column", type=str, default="Subcellular Localization")
     args = parser.parse_args()
 
-
-    prefix_to_points = {prefix: [] for prefix in args.dir_prefixes}
+    # (prefix, num_blocked_neurons) -> list of (lambda, ratio)
+    results = {}
 
     for entry in os.listdir(args.input_dir):
-
-        # _, num, lambda_ = entry.split("_")
-        splits = entry.split("_")
-        prefix = "_".join(splits[:-1])
-        if prefix not in prefix_to_points:
+        entry_path = os.path.join(args.input_dir, entry)
+        if not os.path.isdir(entry_path):
             continue
-        if entry == "80_1_30_.14":
+        # Check if entry starts with any prefix
+        matched_prefix = None
+        for prefix in args.dir_prefixes:
+            if entry.startswith(prefix + "_") or entry == prefix:
+                matched_prefix = prefix
+                break
+        if not matched_prefix:
             continue
-        lambda_ = splits[-1]
-        lambda_ = float(lambda_)
-        csv_path = os.path.join(args.input_dir, entry, "classifiers.csv")
-        df = pd.read_csv(csv_path)
-        ratio = get_label_to_other_ratio(df, args.label, args.column)
-        prefix_to_points[prefix].append((lambda_, ratio))
+        # Parse lambda (after last underscore)
+        try:
+            lambda_ = float(entry.split("_")[-1])
+        except Exception:
+            continue
+        classifiers_dir = os.path.join(entry_path, "classifiers")
+        if not os.path.isdir(classifiers_dir):
+            continue
+        for blocked_neurons in os.listdir(classifiers_dir):
+            blocked_dir = os.path.join(classifiers_dir, blocked_neurons)
+            if not os.path.isdir(blocked_dir):
+                continue
+            csv_path = os.path.join(blocked_dir, "classifiers.csv")
+            if not os.path.isfile(csv_path):
+                continue
+            try:
+                df = pd.read_csv(csv_path)
+                if len(df) == 0:
+                    continue
+                ratio = get_label_to_other_ratio(df, args.label, args.column)
+            except Exception:
+                continue
+            key = (matched_prefix, blocked_neurons)
+            if key not in results:
+                results[key] = []
+            results[key].append((lambda_, ratio))
 
-    plt.figure(figsize=(8, 6))
-    all_multipliers = []
-    for prefix, points in prefix_to_points.items():
+    plt.figure(figsize=(10, 7))
+    all_lambdas = []
+    for (prefix, blocked_neurons), points in results.items():
         if not points:
             continue
-        points.sort()  # sort by lambda_
-        multipliers, ratios = zip(*points)
-        all_multipliers.extend(multipliers)
-        plt.plot(multipliers, ratios, marker='o', label=prefix[2:])
-    # Set more x-ticks
-    if all_multipliers:
+        points.sort()  # sort by lambda
+        lambdas, ratios = zip(*points)
+        all_lambdas.extend(lambdas)
+        label = f"{prefix} | blocked={blocked_neurons}"
+        plt.plot(lambdas, ratios, marker='o', label=label)
+    if all_lambdas:
         import numpy as np
-        min_x, max_x = min(all_multipliers), max(all_multipliers)
-        xticks = np.array([x /1 for x in range(-3, 4, 1)])
+        min_x, max_x = min(all_lambdas), max(all_lambdas)
+        xticks = np.linspace(min_x, max_x, num=10)
         plt.xticks(xticks)
     plt.xlabel("lambda")
     plt.ylabel(f"Ratio of '{args.label}' to all rows")
