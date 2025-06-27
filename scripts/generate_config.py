@@ -26,6 +26,7 @@ def get_sae_conf_dict(
         "intervention_indices_for_pair": pair_indices_path,
         "intervention_indices_for_non_pair": non_pair_indices_path,
         "intervention_lambda": sae_lambda_,
+        "apply_relu_after_intervention": True
     }
 
 

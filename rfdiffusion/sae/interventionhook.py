@@ -20,6 +20,7 @@ class SAEInterventionHook:
         intervention_indices_for_pair: Tuple[torch.Tensor] | str = None,
         intervention_indices_for_non_pair: Tuple[torch.Tensor] | str = None,
         intervention_lambda: float | None = None,
+        apply_relu_after_intervention: bool = True,
     ):
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -54,6 +55,7 @@ class SAEInterventionHook:
             else None
         )
         self.intervention_lambda_ = intervention_lambda
+        self.apply_relu_after_intervention = apply_relu_after_intervention
 
     def _update_sae_latents(
         self,
@@ -63,7 +65,10 @@ class SAEInterventionHook:
         coefs_values, indices = indices[0].to(self.device), indices[1].to(self.device)
         for idx, val in zip(indices, coefs_values):
             mask[:, idx] = val * lambda_ + 1
-        return latents * mask
+        updated = latents * mask
+        if self.apply_relu_after_intervention:
+            return torch.relu(updated)
+        return updated
 
     def _reconstruct_batch_with_sae(
         self,
