@@ -25,11 +25,11 @@ num_of_coefs=${9:-10}
 coefs_src_dir=${10:-"/home/wzarzecki/ds_sae_latents_1600x/coefs/non_pair"}
 PYTHON_OPENSTRCUTERS=${11:-/home/wzarzecki/miniforge3/envs/openstruct/bin/python}
 PYTHON_BIOEMB=${12:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
-PYTHON_RFDIFFUSION=${14:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
+PYTHON_RFDIFFUSION=${14:-/home/wzarzecki/miniforge3/envs/rf124/bin/python}
 PYTHON_PROTEINMPNN=${13:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 
-# # 1)
-# echo "running on cuda: ${cuda_idx}"
+# 1)
+echo "running on cuda: ${cuda_idx}"
 
 structures_dir="$input_dir/pdb/$num_of_coefs" ;
 coefs_dest_dir="$input_dir/coefs/$num_of_coefs" ;
@@ -47,10 +47,13 @@ $PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --lowest_timestep $lowe
   --highest_timestep $highest_timestep \
   --lambda_ $probes_lambda_ \
   --output_config_name $config_name_with_ext \
-  --label "${label}" ;
+  --label "${label}" \
+  --base_dir_non_pair $coefs_dest_dir;
 echo "generated config for RF $label lambda $probes_lambda_ range of timestep $highest_timestep  $lowest_timestep" ;
 # generate structure by RfDiffusion with SAE intervention
 echo "generation of structures ..." ;
+echo "$PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py inference.output_prefix=\"$structures_dir/\" contigmap.contigs=[100-200] inference.num_designs=\"$num_designs\" inference.final_step=\"$final_step\" saeinterventions=\"$config_name_no_ext\" inference.seed=0"
+
 CUDA_VISIBLE_DEVICES="${cuda_idx}" SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RFDiffSAE/scripts/run_inference.py \
 	inference.output_prefix="$structures_dir/" \
  'contigmap.contigs=[100-200]' \
@@ -61,28 +64,28 @@ CUDA_VISIBLE_DEVICES="${cuda_idx}" SAE_DISABLE_TRITON=1 $PYTHON_RFDIFFUSION ./RF
 # keep only pdb
 rm "$structures_dir"/*.trb ;
 
-# 2)
-# inverse-folding with protein-mpnn sequences from structures - 1 sequence per 1 structure (checkout run_inverse_folding.sh)
-echo "inverse-folding to sequences ..."
-sequences_dir="$input_dir/seqs/$num_of_coefs"
-CUDA_VISIBLE_DEVICES="${cuda_idx}" bash ./scripts/protein-struct-pipe/protein_mpnn/run_inverse_folding.sh "$structures_dir"  \
-  "$sequences_dir" \
-  "$PYTHON_PROTEINMPNN" ;
+# # 2)
+# # inverse-folding with protein-mpnn sequences from structures - 1 sequence per 1 structure (checkout run_inverse_folding.sh)
+# echo "inverse-folding to sequences ..."
+# sequences_dir="$input_dir/seqs/$num_of_coefs"
+# CUDA_VISIBLE_DEVICES="${cuda_idx}" bash ./scripts/protein-struct-pipe/protein_mpnn/run_inverse_folding.sh "$structures_dir"  \
+#   "$sequences_dir" \
+#   "$PYTHON_PROTEINMPNN" ;
 
 
-# 3)
-echo "running bio_embeddings classifiers"
-classifiers_dir="$input_dir/classifiers/$num_of_coefs"
-mkdir -p $classifiers_dir ;
-classifiers_file="$classifiers_dir/classifiers.csv"
-CUDA_VISIBLE_DEVICES="${cuda_idx}" bash scripts/protein-struct-pipe/bio_emb/run_classifiers.sh \
-  $sequences_dir \
-  $classifiers_file \
-  $PYTHON_BIOEMB
+# # 3)
+# echo "running bio_embeddings classifiers"
+# classifiers_dir="$input_dir/classifiers/$num_of_coefs"
+# mkdir -p $classifiers_dir ;
+# classifiers_file="$classifiers_dir/classifiers.csv"
+# CUDA_VISIBLE_DEVICES="${cuda_idx}" bash scripts/protein-struct-pipe/bio_emb/run_classifiers.sh \
+#   $sequences_dir \
+#   $classifiers_file \
+#   $PYTHON_BIOEMB
 
-# 4) make plot
-plot_file="$classifiers_dir/subcellular.png"
-$PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -o $plot_file -k $probes_lambda_
+# # 4) make plot
+# plot_file="$classifiers_dir/subcellular.png"
+# $PYTHON_BIOEMB scripts/rfdiffsae/subcellular_bar_plot.py -i  $classifiers_file -o $plot_file -k $probes_lambda_
 
 # 5)
 # new structures from sequences with AlphaFold2
