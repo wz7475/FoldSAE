@@ -34,16 +34,15 @@ def get_path_for_indices(
     timestep: int,
     label: str,
     base_dir: str,
-    sae_type: Literal["pair", "non_pair"],
     filename_suffix: str = "_indices.pt",
 ) -> str:
-    dir_path = os.path.join(base_dir, sae_type)
     filename = f"{label}_{timestep}{filename_suffix}"
-    return os.path.join(dir_path, filename)
+    return os.path.join(base_dir, filename)
 
 
 def get_dict_timestep_sae_hook_conf(
-    indices_tensors_dir: str,
+    indices_tensors_dir_for_non_pair: str,
+    indices_tensors_dir_for_pair: str,
     label: str,
     timesteps: list[int],
     intervention_lambda_: float,
@@ -60,8 +59,7 @@ def get_dict_timestep_sae_hook_conf(
             pair_indices_path = get_path_for_indices(
                 timestep=timestep,
                 label=label,
-                base_dir=indices_tensors_dir,
-                sae_type="pair",
+                base_dir=indices_tensors_dir_for_pair,
             )
         else:
             pair_indices_path = None
@@ -69,8 +67,7 @@ def get_dict_timestep_sae_hook_conf(
             non_pair_indices_path = get_path_for_indices(
                 timestep=timestep,
                 label=label,
-                base_dir=indices_tensors_dir,
-                sae_type="non_pair",
+                base_dir=indices_tensors_dir_for_non_pair,
             )
         else:
             non_pair_indices_path = None
@@ -88,12 +85,14 @@ if __name__ == "__main__":
     parser.add_argument("--lowest_timestep", type=int, default=2)
     parser.add_argument("--lambda_", type=float, default=-1.0)
     parser.add_argument("--output_config_name", type=str, default="block4.yaml")
-    parser.add_argument("--base_dir", default="/home/wzarzecki/ds_sae_latents_1600x/indices")
+    parser.add_argument("--base_dir_non_pair", default="/home/wzarzecki/ds_sae_latents_1600x/indices_non_pair")
+    parser.add_argument("--base_dir_pair", default="/home/wzarzecki/ds_sae_latents_1600x/indices_pair")
     parser.add_argument("--label", default="Cytoplasm")
     args = parser.parse_args()
 
     saes_conf = get_dict_timestep_sae_hook_conf(
-        args.base_dir,
+        args.base_dir_non_pair,
+        args.base_dir_pair,
         args.label,
         list(range(args.lowest_timestep, args.highest_timestep + 1)),
         args.lambda_,
