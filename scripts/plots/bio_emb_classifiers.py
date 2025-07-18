@@ -1,109 +1,62 @@
-import glob
-import argparse
-from enum import Enum
 import pandas as pd
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import argparse
 
+def create_plot(input_dir, output_png):
+    data = []
+    for dirname in os.listdir(input_dir):
+        if dirname.startswith('output_blocks_'):
+            block_num = int(dirname.split('_')[-1])
+            csv_path = os.path.join(input_dir, dirname, 'preds.csv')
+            if os.path.exists(csv_path):
+                df = pd.read_csv(csv_path)
+                df['block'] = block_num
+                data.append(df)
+    if not data:
+        print("No preds.csv files found in the specified input_dir.")
+        return
 
-class Membrane(Enum):
-    MEMBRANE = "Membrane bound"
-    SOLUBLE = "Soluble"
-    # UNKNOWN = "?"
+    combined_df = pd.concat(data, ignore_index=True)
+    kept_classes = ['Cytoplasm', 'Nucleus', 'Extra - cellular']
+    filtered_df = combined_df[combined_df['Subcellular Localization'].isin(kept_classes)]
+    total_counts = filtered_df.groupby('block').size().reset_index(name='total_count')
+    class_counts = filtered_df.groupby(['block', 'Subcellular Localization']).size().reset_index(name='class_count')
+    merged = pd.merge(class_counts, total_counts, on='block')
+    merged['ratio'] = merged['class_count'] / merged['total_count']
 
-    def __str__(self):
-        return {
-            self.MEMBRANE: "Membrane bound",
-            self.SOLUBLE: "Soluble",
-            # self.UNKNOWN: "Unknown",
-        }.get(self)
+    def color_func(block):
+        return 'red' if block == 4 else 'green'
+    merged['color'] = merged['block'].apply(color_func)
 
+    g = sns.FacetGrid(
+        merged,
+        row='Subcellular Localization',
+        sharex=True,
+        sharey=True,
+        height=3,
+        aspect=4
+    )
 
+    def barplot_with_colors(data, **kwargs):
+        plt.bar(
+            data['block'].astype(str),
+            data['ratio'],
+            color=data['color']
+        )
+    g.map_dataframe(barplot_with_colors)
 
-class Location(Enum):
-    CELL_MEMBRANE = "Cell-Membrane"
-    CYTOPLASM = "Cytoplasm"
-    ENDOPLASMATIC_RETICULUM = "Endoplasmic reticulum"
-    GOLGI_APPARATUS = "Golgi - Apparatus"
-    LYSOSOME_OR_VACUOLE = "Lysosome / Vacuole"
-    MITOCHONDRION = "Mitochondrion"
-    NUCLEUS = "Nucleus"
-    PEROXISOME = "Peroxisome"
-    PLASTID = "Plastid"
-    EXTRACELLULAR = "Extra - cellular"
-    # UNKNOWN = "?"
+    g.set_axis_labels('Number of Ablated Block (-1 means no block ablated)', 'Ratio of Samples')
+    g.set_titles(row_template='{row_name}')
 
-    def __str__(self):
-        return {
-            self.CELL_MEMBRANE: "Cell-Membrane",
-            self.CYTOPLASM: "Cytoplasm",
-            self.ENDOPLASMATIC_RETICULUM: "Endoplasmic reticulum",
-            self.GOLGI_APPARATUS: "Golgi - Apparatus",
-            self.LYSOSOME_OR_VACUOLE: "Lysosome / Vacuole",
-            self.MITOCHONDRION: "Mitochondrion",
-            self.NUCLEUS: "Nucleus",
-            self.PEROXISOME: "Peroxisome",
-            self.PLASTID: "Plastid",
-            self.EXTRACELLULAR: "Extra - cellular",
-            # self.UNKNOWN: "?",
-        }.get(self)
+    plt.tight_layout()
+    plt.savefig(output_png)
+    plt.close()
 
-LOCATION_VALUES = [e.value for e  in Location]
-MEMBRANE_VALUES = [e.value for e  in Membrane]
-
-LOCATION_COLUMN = "Subcellular Localization"
-MEMBRANE_COLUMN = "Solubility/Membrane-boundness"
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dir_with_csvs", default="ablation_test")
-    parser.add_argument("--filename", default="classifiers_bio_emb.csv")
-    parser.add_argument("--subcellular_path", default="subcellular.png")
-    parser.add_argument("--solubility_path", default="solubility.png")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Create plot of Subcellular Localization ratio per ablated block')
+    parser.add_argument('--input_dir', type=str, required=True, help='Path to input directory containing output_blocks_* folders')
+    parser.add_argument('--output_png', type=str, required=True, help='Path to output PNG file')
     args = parser.parse_args()
-    input_dir = args.dir_with_csvs
-    filename = args.filename
-
-    # collect list of dicts from csvs
-    list_of_dicts = []
-    for name in glob.glob(f"{input_dir}/**/{filename}", recursive=True):
-        print(name)
-        block_name = name.split("/")[-2]
-        df = pd.read_csv(name)
-        list_of_dicts.append({
-            "name": block_name,
-            LOCATION_COLUMN: df[LOCATION_COLUMN].value_counts(),
-            MEMBRANE_COLUMN: df[MEMBRANE_COLUMN].value_counts()
-        })
-
-    number_of_all_seqs = len(list_of_dicts) * len(df)
-    # merge into single csv
-    values_columns = LOCATION_VALUES + MEMBRANE_VALUES
-    values_lists = [[values_dict[LOCATION_COLUMN].get(key, 0) for values_dict in list_of_dicts] for key in LOCATION_VALUES]
-    values_lists += [[values_dict[MEMBRANE_COLUMN].get(key, 0) for values_dict in list_of_dicts] for key in MEMBRANE_VALUES]
-    values_lists += [[values_dict["name"] for values_dict in list_of_dicts]]
-    final_df = pd.DataFrame(list(zip(*values_lists)), columns=values_columns + ["name"]).sort_values(by="name").set_index("name")
-
-    # for column in values_columns:
-    #     final_df[column] /= number_of_all_seqs
-    y_max = final_df[LOCATION_VALUES].max().max()
-
-
-    # for columns in target_columns:
-    axes = final_df[LOCATION_VALUES].plot.bar(subplots=True, figsize=(8, 16))
-    for ax in axes:
-        ax.set_ylim(0, 1.1 * y_max)
-    plt.subplots_adjust(top=0.98, bottom=.1)
-    plt.savefig(args.subcellular_path)
-
-
-    y_max = final_df[MEMBRANE_VALUES].max().max()
-    final_df.to_csv("rf_diffusion_ablations.csv")
-
-    # for columns in target_columns:
-    axes = final_df[MEMBRANE_VALUES].plot.bar(subplots=True, figsize=(8, 4))
-    for ax in axes:
-        ax.set_ylim(0, 1.1 * y_max)
-    # plt.subplots_adjust(top=0.98, bottom=.02)
-    plt.subplots_adjust(top=0.9, bottom=.3)
-    plt.savefig(args.solubility_path)
+    create_plot(args.input_dir, args.output_png)
