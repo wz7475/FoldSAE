@@ -1,0 +1,6 @@
+map:
+  simulator.main_block.4: block4
+#  as many pairs as needed
+dataset_path: activation_datasets_debug
+keep_every_n_timestep: 1
+keep_every_n_token: 1
