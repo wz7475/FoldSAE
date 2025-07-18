@@ -4,6 +4,3 @@
 [submodule "CLEAN"]
 	path = CLEAN
 	url = git@github.com:wz7475/CLEAN.git
-[submodule "universal-diffsae"]
-	path = universal-diffsae
-	url = git@github.com:wz7475/universal-diffsae.git
