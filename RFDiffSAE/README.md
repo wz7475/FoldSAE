@@ -25,6 +25,7 @@ RFdiffusion is an open source method for structure generation, with or without c
 
 # Table of contents
 
+
 - [RF*diffusion*](#rfdiffusion)
   - [Description](#description)
 - [Table of contents](#table-of-contents)
