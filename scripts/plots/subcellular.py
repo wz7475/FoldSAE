@@ -72,7 +72,7 @@ def main():
     all_classes = collect_all_classes(lambda_dirs)
     if not all_classes:
         # fallback: use example classes
-        all_classes = ['Cytoplasm', 'Membrane', 'Nucleus', 'Secreted']
+        all_classes = ['Cytoplasm', 'Nucleus',]
 
     # Collect counts for each lambda, sort by float value
     sorted_lambdas = sorted(lambda_dirs.keys(), key=lambda x: float(x))
