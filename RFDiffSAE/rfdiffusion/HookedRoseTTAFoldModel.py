@@ -71,11 +71,15 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         )
         self.activations_map = activations["map"] if activations["map"] else {}
         self.blocks_for_ablation = ablations["ablations"]
-        self.block_for_sae_intervention = sae_interventions["block"]
-        self.saes_for_intervention = {
-            timestep: instantiate(instance_conf) if instance_conf else None
-            for timestep, instance_conf in sae_interventions["saes"].items()
-        }
+        self.block_for_sae_intervention = sae_interventions.get("block", None)
+        saes_for_intervention = sae_interventions.get("saes", None)
+        if saes_for_intervention:
+            self.saes_for_intervention = {
+                timestep: instantiate(instance_conf) if instance_conf else None
+                for timestep, instance_conf in sae_interventions["saes"].items()
+            }
+        else:
+            self.saes_for_intervention = {}
         self.simulator = IterativeSimulator(
             n_extra_block=n_extra_block,
             n_main_block=n_main_block,
