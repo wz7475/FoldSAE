@@ -9,3 +9,5 @@ SAE_latents
 example_outputs
 temp_stride
 temp_wandb
+temp_pdb
+stride/stride

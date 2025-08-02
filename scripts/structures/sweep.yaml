@@ -1,0 +1,22 @@
+method: grid
+project: RFDiffSAE
+entity: RFDiffSAE
+name: test_bash
+
+program: scripts/structures/helixes_vs_seq_length.py
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - ${args}
+
+parameters:
+  num_designs:
+    value: 50
+  input_dir:
+    value: temp_pdb
+  prefix:
+    value: design
+  length:
+    values: [50, 75, 100, 125, 150, 175]
