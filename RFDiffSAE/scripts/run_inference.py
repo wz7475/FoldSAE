@@ -162,20 +162,21 @@ def main(conf: HydraConfig) -> None:
             bfacts=bfacts,
         )
 
-        # run metadata
-        trb = dict(
-            config=OmegaConf.to_container(sampler._conf, resolve=True),
-            plddt=plddt_stack.cpu().numpy(),
-            device=torch.cuda.get_device_name(torch.cuda.current_device())
-            if torch.cuda.is_available()
-            else "CPU",
-            time=time.time() - start_time,
-        )
-        if hasattr(sampler, "contig_map"):
-            for key, value in sampler.contig_map.get_mappings().items():
-                trb[key] = value
-        with open(f"{out_prefix}.trb", "wb") as f_out:
-            pickle.dump(trb, f_out)
+        if conf.inference.write_trb:
+            # run metadata
+            trb = dict(
+                config=OmegaConf.to_container(sampler._conf, resolve=True),
+                plddt=plddt_stack.cpu().numpy(),
+                device=torch.cuda.get_device_name(torch.cuda.current_device())
+                if torch.cuda.is_available()
+                else "CPU",
+                time=time.time() - start_time,
+            )
+            if hasattr(sampler, "contig_map"):
+                for key, value in sampler.contig_map.get_mappings().items():
+                    trb[key] = value
+            with open(f"{out_prefix}.trb", "wb") as f_out:
+                pickle.dump(trb, f_out)
 
         if sampler.inf_conf.write_trajectory:
             # trajectory pdbs

@@ -27,6 +27,7 @@ inference:
   model_directory_path: null
   use_random_suffix_for_new_design: true
   seed: null
+  write_trb: False
 
 contigmap:
   contigs: null
