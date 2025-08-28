@@ -11,3 +11,5 @@ temp_stride
 temp_wandb
 temp_pdb
 stride/stride
+.vscode
+structures_sweep

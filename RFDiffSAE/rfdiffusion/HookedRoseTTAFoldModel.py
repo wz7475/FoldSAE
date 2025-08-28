@@ -80,6 +80,11 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
             }
         else:
             self.saes_for_intervention = {}
+        sae_cross_timesteps = sae_interventions.get("sae_cross_timesteps", None)
+        if sae_cross_timesteps:
+            self.sae_cross_timesteps = instantiate(sae_cross_timesteps)
+        else:
+            self.sae_cross_timesteps = None
         self.simulator = IterativeSimulator(
             n_extra_block=n_extra_block,
             n_main_block=n_main_block,
@@ -147,11 +152,14 @@ class HookedRoseTTAFoldModule(RoseTTAFoldModule):
         ]
 
     def _register_sae_intervention_hooks(self, timestep: int) -> list:
-        sae = self.saes_for_intervention.get(timestep)
-        if sae:
-            print(f"registering intervention hook for sae at timestep {timestep}")
-            return [self._register_hook_by_path(self.block_for_sae_intervention, sae)]
-        print(f"no sae instantiated for timestep {timestep}")
+        per_timestep_sae_hook = self.saes_for_intervention.get(timestep)
+        if per_timestep_sae_hook:
+            print(f"registering intervention hook for per_timestep_sae_hook at timestep {timestep}")
+            return [self._register_hook_by_path(self.block_for_sae_intervention, per_timestep_sae_hook)]
+        if self.sae_cross_timesteps:
+            print("registering intervention hook - cross-timesteps")
+            return [self._register_hook_by_path(self.block_for_sae_intervention, self.sae_cross_timesteps)]
+        print(f"no sae_hook instantiated for timestep {timestep}")
         return []
 
     def run_with_hooks(
