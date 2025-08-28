@@ -72,6 +72,7 @@ def main(conf: HydraConfig) -> None:
             indices.append(int(m))
         design_startnum = max(indices) + 1
 
+    activations_for_all_designs = {}
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.seed:
             make_deterministic(conf.inference.seed+i_des)
@@ -85,6 +86,11 @@ def main(conf: HydraConfig) -> None:
         if sampler.inf_conf.cautious and os.path.exists(out_prefix + ".pdb"):
             log.info(
                 f"(cautious mode) Skipping this design because {out_prefix}.pdb already exists."
+            )
+            continue
+        if sampler.inf_conf.cautious and os.path.exists(out_prefix + ".txt"):
+            log.info(
+                f"(cautious mode) Skipping this design because {out_prefix} failed before - {out_prefix}.txt  already exists."
             )
             continue
 
@@ -108,11 +114,14 @@ def main(conf: HydraConfig) -> None:
                 seq_stack.append(seq_t)
                 plddt_stack.append(plddt[0])  # remove singleton leading dimension
                 append_timestep_activations(activations_per_design, activations_dict, t, conf.activations.keep_every_n_timestep, conf.activations.keep_every_n_token)
-        except np.linalg.LinAlgError as e:
-            print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
-            continue
+        # except np.linalg.LinAlgError as e:
+        #     print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
+        #     continue
         except Exception as e:
-            print(f"exception {e}")
+            print(f"exception {e}. Skiping to next one. Log into {out_prefix}.txt")
+            with open(f"{out_prefix}.txt", "w") as f:
+                f.write(f"Structure {structure_id}. Timestep {t}. Caught exception {e}. Skipped design")
+            continue
             raise
 
         if conf.activations.dataset_path:
