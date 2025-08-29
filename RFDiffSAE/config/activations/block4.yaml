@@ -2,5 +2,6 @@ map:
   simulator.main_block.4: block4
 #  as many pairs as needed
 dataset_path: temp_activations
-keep_every_n_timestep: 10
-keep_every_n_token: 10
+keep_every_n_timestep: 1
+keep_every_n_token: 1
+save_activations_after_n_designs: 10

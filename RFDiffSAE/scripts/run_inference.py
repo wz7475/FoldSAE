@@ -27,7 +27,7 @@ from omegaconf import OmegaConf
 import hydra
 import logging
 
-from rfdiffusion.activations import add_meta_data_and_reduce_activations
+from rfdiffusion.activations import add_meta_data_and_reduce_activations, save_activations_shard
 from rfdiffusion.util import writepdb_multi, writepdb
 from rfdiffusion.inference import utils as iu
 from hydra.core.hydra_config import HydraConfig
@@ -77,7 +77,10 @@ def main(conf: HydraConfig) -> None:
             indices.append(int(m))
         design_startnum = max(indices) + 1
 
+
     activations_for_all_designs = {}
+    save_activs_every = getattr(conf.activations, "save_activations_after_n_designs", 1)
+    shard_idx = 0
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.seed:
             make_deterministic(conf.inference.seed + i_des)
@@ -107,7 +110,6 @@ def main(conf: HydraConfig) -> None:
 
         x_t = torch.clone(x_init)
         seq_t = torch.clone(seq_init)
-        # Loop over number of reverse diffusion time steps.
         activations_per_design = {}
         try:
             for t in range(
@@ -123,7 +125,7 @@ def main(conf: HydraConfig) -> None:
                 px0_xyz_stack.append(px0)
                 denoised_xyz_stack.append(x_t)
                 seq_stack.append(seq_t)
-                plddt_stack.append(plddt[0])  # remove singleton leading dimension
+                plddt_stack.append(plddt[0])
                 add_meta_data_and_reduce_activations(
                     activations_per_design,
                     activations_dict,
@@ -143,41 +145,24 @@ def main(conf: HydraConfig) -> None:
         if conf.activations.dataset_path:
             activations_for_all_designs[structure_id] = activations_per_design
 
-        # Flip order for better visualization in pymol
+        # Save activations every N designs as a new shard
+        if conf.activations.dataset_path and len(activations_for_all_designs) >= save_activs_every:
+            save_activations_shard(activations_for_all_designs, conf.activations.dataset_path, shard_idx)
+            activations_for_all_designs.clear()
+            shard_idx += 1
+
+        # ...existing code for flipping, saving pdb, trb, trajectory, etc...
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
-        denoised_xyz_stack = torch.flip(
-            denoised_xyz_stack,
-            [
-                0,
-            ],
-        )
+        denoised_xyz_stack = torch.flip(denoised_xyz_stack, [0,])
         px0_xyz_stack = torch.stack(px0_xyz_stack)
-        px0_xyz_stack = torch.flip(
-            px0_xyz_stack,
-            [
-                0,
-            ],
-        )
-
-        # For logging -- don't flip
+        px0_xyz_stack = torch.flip(px0_xyz_stack, [0,])
         plddt_stack = torch.stack(plddt_stack)
-
-        # Save outputs
         os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
         final_seq = seq_stack[-1]
-
-        # Output glycines, except for motif region
-        final_seq = torch.where(
-            torch.argmax(seq_init, dim=-1) == 21, 7, torch.argmax(seq_init, dim=-1)
-        )  # 7 is glycine
-
+        final_seq = torch.where(torch.argmax(seq_init, dim=-1) == 21, 7, torch.argmax(seq_init, dim=-1))
         bfacts = torch.ones_like(final_seq.squeeze())
-        # make bfact=0 for diffused coordinates
         bfacts[torch.where(torch.argmax(seq_init, dim=-1) == 21, True, False)] = 0
-        # pX0 last step
         out = f"{out_prefix}.pdb"
-
-        # Now don't output sidechains
         writepdb(
             out,
             denoised_xyz_stack[0, :, :4],
@@ -186,9 +171,7 @@ def main(conf: HydraConfig) -> None:
             chain_idx=sampler.chain_idx,
             bfacts=bfacts,
         )
-
         if conf.inference.write_trb:
-            # run metadata
             trb = dict(
                 config=OmegaConf.to_container(sampler._conf, resolve=True),
                 plddt=plddt_stack.cpu().numpy(),
@@ -202,14 +185,11 @@ def main(conf: HydraConfig) -> None:
                     trb[key] = value
             with open(f"{out_prefix}.trb", "wb") as f_out:
                 pickle.dump(trb, f_out)
-
         if sampler.inf_conf.write_trajectory:
-            # trajectory pdbs
             traj_prefix = (
                 os.path.dirname(out_prefix) + "/traj/" + os.path.basename(out_prefix)
             )
             os.makedirs(os.path.dirname(traj_prefix), exist_ok=True)
-
             out = f"{traj_prefix}_Xt-1_traj.pdb"
             writepdb_multi(
                 out,
@@ -220,7 +200,6 @@ def main(conf: HydraConfig) -> None:
                 backbone_only=False,
                 chain_ids=sampler.chain_idx,
             )
-
             out = f"{traj_prefix}_pX0_traj.pdb"
             writepdb_multi(
                 out,
@@ -230,39 +209,12 @@ def main(conf: HydraConfig) -> None:
                 use_hydrogens=False,
                 backbone_only=False,
                 chain_ids=sampler.chain_idx,
-            )#
-
+            )
         log.info(f"Finished design in {(time.time() - start_time) / 60:.2f} minutes")
 
-    # Save all activations as a single dataset if requested
+    # Save any remaining activations after loop
     if conf.activations.dataset_path and activations_for_all_designs:
-        all_records = []
-        for structure_id, activations_per_design in activations_for_all_designs.items():
-            for key in activations_per_design:
-                for timestep in activations_per_design[key]:
-                    activations_per_timestep = activations_per_design[key][timestep]
-                    for idx, item in enumerate(activations_per_timestep):
-                        # support both old-format raw values and new dict with amino_acid_id and value
-                        if isinstance(item, dict) and "amino_acid_id" in item:
-                            amino_acid_id = item.get("amino_acid_id")
-                            value = item.get("value")
-                        else:
-                            amino_acid_id = None
-                            value = item
-                        all_records.append(
-                            {
-                                "structure_id": structure_id,
-                                "key": key,
-                                "timestep": timestep,
-                                "idx": idx,
-                                "amino_acid_id": amino_acid_id,
-                                "value": value,
-                            }
-                        )
-        if all_records:
-            ds = Dataset.from_list(all_records)
-            os.makedirs(conf.activations.dataset_path, exist_ok=True)
-            ds.save_to_disk(conf.activations.dataset_path)
+        save_activations_shard(activations_for_all_designs, conf.activations.dataset_path, shard_idx)
 
 
 if __name__ == "__main__":
