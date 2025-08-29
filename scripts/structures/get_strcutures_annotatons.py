@@ -1,5 +1,6 @@
 import os
-from datasets import Dataset
+from time import sleep
+from datasets import Dataset, disable_caching
 import re
 
 from simple_parsing import ArgumentParser
@@ -70,22 +71,21 @@ def add_secondary_struct_column(ds: Dataset, stride_dir: str) -> Dataset:
 
 def add_helix_and_beta_columns(ds: Dataset) -> Dataset:
     """
-    Adds a 'helix' column to the dataset based on the 'secondary_struct' column.
+    Adds 'helix' and 'beta' columns to the dataset based on the 'secondary_struct' column.
     The 'helix' column is True if 'secondary_struct' is 'G', 'H', or 'I', otherwise False.
+    The 'beta' column is True if 'secondary_struct' is 'E' or 'B', otherwise False.
     """
     helix_letters = {"G", "H", "I"}
     beta_letters = {"E", "B"}
 
-    def check_if_helix(example):
+    def add_helix_beta(example):
         ss = example.get("secondary_struct")
-        return {"helix": ss is not None and ss in helix_letters}
+        return {
+            "helix": ss is not None and ss in helix_letters,
+            "beta": ss is not None and ss in beta_letters,
+        }
 
-    def check_if_beta(example):
-        ss = example.get("secondary_struct")
-        return {"beta": ss is not None and ss in beta_letters}
-
-    ds = ds.map(check_if_helix)
-    ds = ds.map(check_if_beta)
+    ds = ds.map(add_helix_beta)
     return ds
 
 
@@ -95,6 +95,8 @@ if __name__ == "__main__":
     parser.add_argument("--input_dataset_path")
     parser.add_argument("--output_dataset_path")
     args = parser.parse_args()
+
+    disable_caching()
 
     ds = Dataset.load_from_disk(args.input_dataset_path)
     ds = add_secondary_struct_column(ds, args.stride_dir)

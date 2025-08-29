@@ -1,6 +1,6 @@
-num_designs=${1:-1}
-input_dir=${2:-./temp_probes_ds}
-protein_length=${3:-50}
+num_designs=${1:-2}
+input_dir=${2:-./temp_probes_ds_2}
+protein_length=${3:-150}
 final_step=${3:-1}
 log_file=${14:-/home/wzarzecki/logs/probes_ds.log}
 SAE_PAIR_PATH=${14:-sae-ckpts/picked/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr0.0005_..activations_1200_block4_pair/block4_pair}
