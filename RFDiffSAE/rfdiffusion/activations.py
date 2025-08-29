@@ -88,7 +88,7 @@ def save_activations_shard(
                             "timestep": timestep,
                             "idx": idx,
                             "amino_acid_id": amino_acid_id,
-                            "value": value,
+                            "activations": value,
                         }
                     )
     if all_records:
