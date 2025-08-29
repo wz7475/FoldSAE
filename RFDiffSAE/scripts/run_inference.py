@@ -16,15 +16,18 @@ See https://hydra.cc/docs/advanced/hydra-command-line-flags/ for more options.
 """
 
 import re
-import os, time, pickle
+import os
+import time
+import pickle
 from uuid import uuid4
+from datasets import Dataset
 
 import torch
 from omegaconf import OmegaConf
 import hydra
 import logging
 
-from rfdiffusion.activations import save_activations_incrementally, append_timestep_activations
+from rfdiffusion.activations import add_meta_data_and_reduce_activations
 from rfdiffusion.util import writepdb_multi, writepdb
 from rfdiffusion.inference import utils as iu
 from hydra.core.hydra_config import HydraConfig
@@ -48,7 +51,9 @@ def main(conf: HydraConfig) -> None:
     # Check for available GPU and print result of check
     if torch.cuda.is_available():
         device_name = torch.cuda.get_device_name(torch.cuda.current_device())
-        log.info(f"Found GPU with device_name {device_name}. Will run RFdiffusion on {device_name}")
+        log.info(
+            f"Found GPU with device_name {device_name}. Will run RFdiffusion on {device_name}"
+        )
     else:
         log.info("////////////////////////////////////////////////")
         log.info("///// NO GPU DETECTED! Falling back to CPU /////")
@@ -75,7 +80,7 @@ def main(conf: HydraConfig) -> None:
     activations_for_all_designs = {}
     for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
         if conf.inference.seed:
-            make_deterministic(conf.inference.seed+i_des)
+            make_deterministic(conf.inference.seed + i_des)
 
         start_time = time.time()
         out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des}"
@@ -105,27 +110,38 @@ def main(conf: HydraConfig) -> None:
         # Loop over number of reverse diffusion time steps.
         activations_per_design = {}
         try:
-            for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
+            for t in range(
+                int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1
+            ):
                 px0, x_t, seq_t, plddt, activations_dict = sampler.sample_step(
-                    t=t, x_t=x_t, seq_init=seq_t, final_step=sampler.inf_conf.final_step, structure_id=structure_id
+                    t=t,
+                    x_t=x_t,
+                    seq_init=seq_t,
+                    final_step=sampler.inf_conf.final_step,
+                    structure_id=structure_id,
                 )
                 px0_xyz_stack.append(px0)
                 denoised_xyz_stack.append(x_t)
                 seq_stack.append(seq_t)
                 plddt_stack.append(plddt[0])  # remove singleton leading dimension
-                append_timestep_activations(activations_per_design, activations_dict, t, conf.activations.keep_every_n_timestep, conf.activations.keep_every_n_token)
-        # except np.linalg.LinAlgError as e:
-        #     print(f"caught np.linalg.LinAlgError, exiting generation of {structure_id} and proceeding to next one")
-        #     continue
+                add_meta_data_and_reduce_activations(
+                    activations_per_design,
+                    activations_dict,
+                    t,
+                    conf.activations.keep_every_n_timestep,
+                    conf.activations.keep_every_n_token,
+                )
         except Exception as e:
             print(f"exception {e}. Skiping to next one. Log into {out_prefix}.txt")
             with open(f"{out_prefix}.txt", "w") as f:
-                f.write(f"Structure {structure_id}. Timestep {t}. Caught exception {e}. Skipped design")
+                f.write(
+                    f"Structure {structure_id}. Timestep {t}. Caught exception {e}. Skipped design"
+                )
             continue
             raise
 
         if conf.activations.dataset_path:
-            save_activations_incrementally(activations_per_design, conf.activations.dataset_path, structure_id)
+            activations_for_all_designs[structure_id] = activations_per_design
 
         # Flip order for better visualization in pymol
         denoised_xyz_stack = torch.stack(denoised_xyz_stack)
@@ -190,7 +206,7 @@ def main(conf: HydraConfig) -> None:
         if sampler.inf_conf.write_trajectory:
             # trajectory pdbs
             traj_prefix = (
-                    os.path.dirname(out_prefix) + "/traj/" + os.path.basename(out_prefix)
+                os.path.dirname(out_prefix) + "/traj/" + os.path.basename(out_prefix)
             )
             os.makedirs(os.path.dirname(traj_prefix), exist_ok=True)
 
@@ -214,9 +230,39 @@ def main(conf: HydraConfig) -> None:
                 use_hydrogens=False,
                 backbone_only=False,
                 chain_ids=sampler.chain_idx,
-            )
+            )#
 
-        log.info(f"Finished design in {(time.time()-start_time)/60:.2f} minutes")
+        log.info(f"Finished design in {(time.time() - start_time) / 60:.2f} minutes")
+
+    # Save all activations as a single dataset if requested
+    if conf.activations.dataset_path and activations_for_all_designs:
+        all_records = []
+        for structure_id, activations_per_design in activations_for_all_designs.items():
+            for key in activations_per_design:
+                for timestep in activations_per_design[key]:
+                    activations_per_timestep = activations_per_design[key][timestep]
+                    for idx, item in enumerate(activations_per_timestep):
+                        # support both old-format raw values and new dict with amino_acid_id and value
+                        if isinstance(item, dict) and "amino_acid_id" in item:
+                            amino_acid_id = item.get("amino_acid_id")
+                            value = item.get("value")
+                        else:
+                            amino_acid_id = None
+                            value = item
+                        all_records.append(
+                            {
+                                "structure_id": structure_id,
+                                "key": key,
+                                "timestep": timestep,
+                                "idx": idx,
+                                "amino_acid_id": amino_acid_id,
+                                "value": value,
+                            }
+                        )
+        if all_records:
+            ds = Dataset.from_list(all_records)
+            os.makedirs(conf.activations.dataset_path, exist_ok=True)
+            ds.save_to_disk(conf.activations.dataset_path)
 
 
 if __name__ == "__main__":

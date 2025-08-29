@@ -1,37 +1,51 @@
-import os
 import random
-from uuid import uuid4
-
-from datasets import Dataset
 
 
-def save_activations_incrementally(activations_per_design, output_dir, structure_id: str):
-    """
-    Save activations for a single design incrementally. Adds random identifier not to other write design with same
-    index.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    for key in activations_per_design:
-        for timestep in activations_per_design[key]: # all
-            activations_per_timestep = activations_per_design[key][timestep]
-            if "non" not in key:
-                # pair generates seq_len more activations(seq_len x seq_len) instead of (seq_len)
-                activations_per_timestep = random.sample(activations_per_timestep, int(len(activations_per_timestep) ** .5))
-            ds = Dataset.from_dict({
-                "values": activations_per_timestep
-            })
-            ds_output_dir = os.path.join(output_dir, key, f"{timestep}")
-            ds.save_to_disk(os.path.join(ds_output_dir, structure_id))
-
-
-def append_timestep_activations(activations_per_design: dict, timestep_activations: dict, timestep: int, keep_every_n_timestep: int = 1,
-        keep_every_n_token: int = 1):
+def add_meta_data_and_reduce_activations(
+    activations_per_design: dict,
+    timestep_activations: dict,
+    timestep: int,
+    keep_every_n_timestep: int = 1,
+    keep_every_n_token: int = 1,
+):
     if random.randint(0, keep_every_n_timestep - 1) == 0:
         for key in timestep_activations:
-            tokens_to_save = len(timestep_activations[key]) // keep_every_n_token
-            reduced_activations = random.choices(timestep_activations[key], k=tokens_to_save)
+            # number of tokens to save (may be zero)
+            num_tokens_to_save = len(timestep_activations[key]) // keep_every_n_token
+            # sample indices (allowing repeats, to preserve existing behavior)
+            if num_tokens_to_save <= 0:
+                reduced_activations = []
+            else:
+                sampled_indices = random.choices(
+                    range(len(timestep_activations[key])), k=num_tokens_to_save
+                )
+                # save amino_acid id(s) and value so downstream can record residue indices
+                reduced_activations = []
+                total_len = len(timestep_activations[key])
+                # try to infer seq_len for pair tensors (flattened seq_len * seq_len)
+                try:
+                    seq_len = int(round(total_len ** 0.5))
+                except Exception:
+                    seq_len = None
+                for i in sampled_indices:
+                    if "non_pair" in key:
+                        # non-pair entries correspond to per-residue features
+                        amino_acid_id = int(i)
+                    else:
+                        # pair entries were flattened as (seq_len * seq_len, -1)
+                        if seq_len and seq_len * seq_len == total_len:
+                            row = i // seq_len
+                            # col = i % seq_len
+                            amino_acid_id = int(row)
+                        else:
+                            # fallback: keep flat index if we can't infer seq_len
+                            amino_acid_id = int(i)
+                    reduced_activations.append(
+                        {"amino_acid_id": amino_acid_id, "value": timestep_activations[key][i]}
+                    )
             if activations_per_design.get(key):
                 activations_per_design[key][timestep] = reduced_activations
             else:
                 activations_per_design[key] = {}
                 activations_per_design[key][timestep] = reduced_activations
+            # activations_per_design["structure_id"] = structure_id
