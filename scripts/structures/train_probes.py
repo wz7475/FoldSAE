@@ -16,6 +16,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+import json
 
 
 def load_and_concat_datasets(datasets_dir: str) -> Dataset:
@@ -62,8 +63,9 @@ def train_and_evaluate(
     y_test: np.ndarray,
     class_weight="balanced",
     plot: bool = True,
+    max_iter: int = 100
 ):
-    model = LogisticRegression(class_weight=class_weight, max_iter=1000)
+    model = LogisticRegression(class_weight=class_weight, max_iter=max_iter)
     print("Fitting logistic regression...")
     model.fit(X_train, y_train)
     print("Model fitted.")
@@ -78,7 +80,7 @@ def train_and_evaluate(
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Balanced Accuracy: {balanced_accuracy:.4f}")
     print(f"ROC AUC Score: {roc_auc:.4f}")
-    print(f"AUPR: {average_precision_score(y_test, y_pred_proba):.4f}")
+    print(f"avg precision: {average_precision_score(y_test, y_pred_proba):.4f}")
 
     if plot:
         fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
@@ -107,7 +109,16 @@ def train_and_evaluate(
         plt.title("Precision-Recall Curve")
         plt.show()
 
-    return model
+    metrics = {
+        "accuracy": float(accuracy),
+        "balanced_accuracy": float(balanced_accuracy),
+        "roc_auc": float(roc_auc),
+        "average_precision": float(average_precision_score(y_test, y_pred_proba)),
+        "n_train": int(len(y_train)),
+        "n_test": int(len(y_test)),
+    }
+
+    return model, metrics
 
 
 def save_coeffs(
@@ -132,6 +143,7 @@ def parse_args():
         default="/home/wzarzecki/ds_10000x/very_tiny_ds",
         help="Directory containing one or more dataset subdirectories to load and concatenate.",
     )
+    p.add_argument("--multiple_datasets", action="store_true", help="Load and concatenate all datasets in datasets_dir.", default=False)
     p.add_argument(
         "--coefs_dir",
         type=str,
@@ -143,35 +155,103 @@ def parse_args():
     p.add_argument("--test_size", type=float, default=0.2)
     p.add_argument("--random_state", type=int, default=42)
     p.add_argument(
-        "--no_plot", action="store_true", help="Disable plotting of ROC and PR curves."
+        "--plot", action="store_true", help="Disable plotting of ROC and PR curves."
     )
     p.add_argument(
         "--pairing",
-        choices=["pair", "non_pair"],
+        choices=["pair", "non_pair", "concat"],
         default="pair",
         help=(
             "Select rows by key suffix: 'non_pair' keeps rows where key endswith 'non_pair',"
-            " 'pair' keeps the other rows. Requires a 'key' column in the dataset."
+            " 'pair' keeps the other rows. 'concat' will group by (structure_id, amino_acid_id)"
+            " and concatenate their latent vectors. Requires 'structure_id','amino_acid_id'"
+            " and 'latents' columns."
         ),
     )
     p.add_argument("--target", choices=["helix", "beta"], default="helix", help="Target helix type for OVR classification.")
+    p.add_argument("--max_iter", type=int, default=100, help="Maximum iterations for logistic regression.")
+    p.add_argument("--timestep", type=int, default=None, help="Timestep to filter on if applicable.")
+    p.add_argument(
+        "--results_json",
+        type=str,
+        default=None,
+        help="Path to write a JSON file with evaluation metrics (optional).",
+    )
     return p.parse_args()
+
+
+def concat_latents_by_residue(df: pd.DataFrame) -> pd.DataFrame:
+    """For each (structure_id, amino_acid_id) pair, find one row whose 'key' endswith 'non_pair'
+    and one row whose 'key' does not; concatenate their 'latents' (non_pair first, then pair)
+    and return a DataFrame containing one row per matched pair. Groups missing either side are
+    skipped. Other metadata is taken from the 'pair' (non 'non_pair') row.
+    """
+    # validate required columns
+    for col in ("structure_id", "amino_acid_id", "latents", "key"):
+        if col not in df.columns:
+            raise RuntimeError(f"Dataset must contain '{col}' column to use pairing='concat'.")
+
+    rows = []
+    grouped = df.groupby(["structure_id", "amino_acid_id"])
+    for (sid, aaid), g in grouped:
+        # ensure keys are strings
+        keys = g["key"].astype(str)
+        non_pair_idx = keys[keys.str.endswith("non_pair")].index
+        pair_idx = keys[~keys.str.endswith("non_pair")].index
+        # require one of each
+        if len(non_pair_idx) == 0 or len(pair_idx) == 0:
+            continue
+        # pick the first occurrence of each
+        non_pair_row = g.loc[non_pair_idx[0]]
+        pair_row = g.loc[pair_idx[0]]
+
+        latent_non = np.asarray(non_pair_row["latents"])
+        latent_pair = np.asarray(pair_row["latents"])
+        concat_latent = np.concatenate([latent_non, latent_pair], axis=0)
+
+        example = pair_row.to_dict()
+        example["latents"] = concat_latent
+        rows.append(example)
+
+    if not rows:
+        # return empty df with same columns to avoid downstream failures
+        return pd.DataFrame(columns=df.columns)
+    return pd.DataFrame(rows)
 
 
 def main():
     args = parse_args()
 
-    ds = load_and_concat_datasets(args.datasets_dir)
+    if args.multiple_datasets:
+        print(f"Loading and concatenating all datasets in {args.datasets_dir}...")
+        ds = load_and_concat_datasets(args.datasets_dir)
+    else:
+        print(f"Loading single dataset from {args.datasets_dir}...")
+        ds = Dataset.load_from_disk(args.datasets_dir)
+        ds.set_format("torch")
+        print(f"Loaded dataset from: {args.datasets_dir}")
     df = ds.to_pandas()
 
-    # Filter dataset by pairing option using the 'key' column
-    if args.pairing:
+    if args.timestep is not None:
+        if "timestep" not in df.columns:
+            raise RuntimeError("Dataset does not contain 'timestep' column for filtering.")
+        df = df[df["timestep"] == args.timestep]
+        print(f"Filtered dataset to timestep={args.timestep}, new size: {len(df)}")
+
+    # pairing handling: support 'pair', 'non_pair' (key-based) and 'concat' (group & concat latents)
+    if args.pairing == "concat":
+        df = concat_latents_by_residue(df)
+        print(f"Concatenated latents by residue, new dataset size: {len(df)}")
+    else:
+        # existing key-based filtering
         if "key" not in df.columns:
             raise RuntimeError("Dataset does not contain required 'key' column for pairing filter.")
         if args.pairing == "non_pair":
             df = df[df["key"].astype(str).str.endswith("non_pair")]
         else:
             df = df[~df["key"].astype(str).str.endswith("non_pair")]
+        print(f"Filtered dataset by pairing='{args.pairing}', new size: {len(df)}")
+
     train_df, test_df = prepare_train_test(
         df, test_size=args.test_size, random_state=args.random_state
     )
@@ -185,9 +265,17 @@ def main():
     X_test = np.vstack(np.array(test_df_small["latents"]))
     y_test = test_df_small[target_column].to_numpy()
 
-    model = train_and_evaluate(X_train, y_train, X_test, y_test, plot=not args.no_plot)
+    model, metrics = train_and_evaluate(X_train, y_train, X_test, y_test, plot=args.plot, max_iter=args.max_iter)
 
     save_coeffs(model, args.coefs_dir, args.coefs_filename, args.bias_filename)
+
+    if args.results_json is not None:
+        out_dir = os.path.dirname(args.results_json)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        with open(args.results_json, "w") as f:
+            json.dump(metrics, f, indent=2)
+        print(f"Wrote results JSON -> {args.results_json}")
 
 
 if __name__ == "__main__":
