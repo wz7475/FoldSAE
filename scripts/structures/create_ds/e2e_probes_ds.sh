@@ -48,7 +48,7 @@ done
 echo "generated latents" >> "$log_file";
 
 # 3) run stride annotations
-cmd="$PYTHON_SAE scripts/structures/run_stride.py \
+cmd="$PYTHON_SAE scripts/structures/utils/run_stride.py \
   --pdb_dir \"$pdb_dir\" \
   --stride_dir \"$stride_dir\" \
   --stride_binary \"$stride_binary\""
@@ -61,7 +61,7 @@ for shard in "$latents_path"/shard*; do
   shard_name=$(basename "$shard")
   output_shard="$structure_datasets_dir/$shard_name"
   echo "output shard $output_shard"
-  cmd="$PYTHON_SAE scripts/structures/get_strcutures_annotatons.py \
+  cmd="$PYTHON_SAE scripts/structures/create_ds/get_strcutures_annotatons.py \
     --stride_dir \"$stride_dir\" \
     --input_dataset_path \"$shard\" \
     --output_dataset_path \"$output_shard\""

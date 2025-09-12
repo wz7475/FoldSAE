@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="/data/wzarzecki/SAEtoRuleRFDiffusion"
-PY_SCRIPT="$PROJECT_ROOT/scripts/structures/train_probes.py"
+PY_SCRIPT="$PROJECT_ROOT/scripts/structures/probes/train_probes.py"
 DATASETS_DIR="$HOME/ds_10000x/structures_ds_merged"
 BASE_COEFS_DIR="$HOME/ds_10000x/coefs"
 BASE_RESULTS_DIR="$HOME/ds_10000x/results/probes"
