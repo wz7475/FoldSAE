@@ -9,10 +9,12 @@ BASE_COEFS_DIR="$HOME/ds_10000x/coefs"
 BASE_RESULTS_DIR="$HOME/ds_10000x/results/probes"
 PYTHON="/home/wzarzecki/miniforge3/envs/diffsae/bin/python"
 
-pairings=("pair" "non_pair" "concat")
+# pairings=("pair" "non_pair" "concat")
+pairings=("loose_concat")
 
 # add target sweep
 targets=("helix" "beta")
+# targets=("beta")
 
 timesteps=("none") # include case with no --timestep argument
 for i in $(seq 1 50); do
@@ -37,6 +39,12 @@ for pairing in "${pairings[@]}"; do
 
       coefs_dir="$BASE_COEFS_DIR/$run_name"
       results_json="$BASE_RESULTS_DIR/$run_name.json"
+
+      # Skip this run if results JSON already exists
+      if [ -f "$results_json" ]; then
+        echo "Skipping run: $run_name (results already exist at $results_json)"
+        continue
+      fi
 
       mkdir -p "$coefs_dir"
       mkdir -p "$(dirname "$results_json")"

@@ -67,58 +67,62 @@ def train_and_evaluate(
 ):
     model = LogisticRegression(class_weight=class_weight, max_iter=max_iter)
     print("Fitting logistic regression...")
-    model.fit(X_train, y_train)
-    print("Model fitted.")
+    try:
+        model.fit(X_train, y_train)
+        print("Model fitted.")
 
-    y_pred = model.predict(X_test)
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
+        y_pred = model.predict(X_test)
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
 
-    accuracy = accuracy_score(y_test, y_pred)
-    balanced_accuracy = balanced_accuracy_score(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, y_pred_proba)
+        accuracy = accuracy_score(y_test, y_pred)
+        balanced_accuracy = balanced_accuracy_score(y_test, y_pred)
+        roc_auc = roc_auc_score(y_test, y_pred_proba)
 
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"Balanced Accuracy: {balanced_accuracy:.4f}")
-    print(f"ROC AUC Score: {roc_auc:.4f}")
-    print(f"avg precision: {average_precision_score(y_test, y_pred_proba):.4f}")
+        print(f"Accuracy: {accuracy:.4f}")
+        print(f"Balanced Accuracy: {balanced_accuracy:.4f}")
+        print(f"ROC AUC Score: {roc_auc:.4f}")
+        print(f"avg precision: {average_precision_score(y_test, y_pred_proba):.4f}")
 
-    if plot:
-        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-        plt.figure()
-        plt.plot(
-            fpr,
-            tpr,
-            color="darkorange",
-            lw=2,
-            label=f"ROC curve (area = {roc_auc:.2f})",
-        )
-        plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title("Receiver Operating Characteristic (ROC) Curve")
-        plt.legend(loc="lower right")
-        plt.show()
+        if plot:
+            fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+            plt.figure()
+            plt.plot(
+                fpr,
+                tpr,
+                color="darkorange",
+                lw=2,
+                label=f"ROC curve (area = {roc_auc:.2f})",
+            )
+            plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--")
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.05])
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.title("Receiver Operating Characteristic (ROC) Curve")
+            plt.legend(loc="lower right")
+            plt.show()
 
-        precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
-        plt.figure()
-        plt.plot(recall, precision)
-        plt.xlabel("Recall")
-        plt.ylabel("Precision")
-        plt.title("Precision-Recall Curve")
-        plt.show()
+            precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
+            plt.figure()
+            plt.plot(recall, precision)
+            plt.xlabel("Recall")
+            plt.ylabel("Precision")
+            plt.title("Precision-Recall Curve")
+            plt.show()
 
-    metrics = {
-        "accuracy": float(accuracy),
-        "balanced_accuracy": float(balanced_accuracy),
-        "roc_auc": float(roc_auc),
-        "average_precision": float(average_precision_score(y_test, y_pred_proba)),
-        "n_train": int(len(y_train)),
-        "n_test": int(len(y_test)),
-    }
+        metrics = {
+            "accuracy": float(accuracy),
+            "balanced_accuracy": float(balanced_accuracy),
+            "roc_auc": float(roc_auc),
+            "average_precision": float(average_precision_score(y_test, y_pred_proba)),
+            "n_train": int(len(y_train)),
+            "n_test": int(len(y_test)),
+        }
 
-    return model, metrics
+        return model, metrics
+    except ValueError as e:
+        print(f"Error during model training or evaluation: {e}")
+        return None, {}
 
 
 def save_coeffs(
@@ -159,13 +163,15 @@ def parse_args():
     )
     p.add_argument(
         "--pairing",
-        choices=["pair", "non_pair", "concat"],
+        choices=["pair", "non_pair", "concat", "loose_concat"],
         default="pair",
         help=(
             "Select rows by key suffix: 'non_pair' keeps rows where key endswith 'non_pair',"
             " 'pair' keeps the other rows. 'concat' will group by (structure_id, amino_acid_id)"
             " and concatenate their latent vectors. Requires 'structure_id','amino_acid_id'"
-            " and 'latents' columns."
+            " and 'latents' columns. 'loose_concat' is like 'concat' but discards any 'timestep'"
+            " information and produces every possible combination of a 'non_pair' and a 'pair'"
+            " entry for the same (structure_id, amino_acid_id)."
         ),
     )
     p.add_argument("--target", choices=["helix", "beta"], default="helix", help="Target helix type for OVR classification.")
@@ -219,6 +225,53 @@ def concat_latents_by_residue(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def loose_concat_latents_by_residue(df: pd.DataFrame) -> pd.DataFrame:
+    """For each (structure_id, amino_acid_id) pair, find all rows whose 'key' endswith
+    'non_pair' and all rows whose 'key' does not; create every possible combination
+    (cartesian product) of one non_pair and one pair, concatenate their 'latents'
+    (non_pair first, then pair) and return a DataFrame containing one row per combination.
+    The returned examples will have timestep information removed (if present).
+    Groups missing either side are skipped.
+    """
+    # validate required columns
+    for col in ("structure_id", "amino_acid_id", "latents", "key"):
+        if col not in df.columns:
+            raise RuntimeError(f"Dataset must contain '{col}' column to use pairing='loose_concat'.")
+
+    rows = []
+    grouped = df.groupby(["structure_id", "amino_acid_id"])
+    for (sid, aaid), g in grouped:
+        # ensure keys are strings
+        keys = g["key"].astype(str)
+        non_pair_idx = keys[keys.str.endswith("non_pair")].index
+        pair_idx = keys[~keys.str.endswith("non_pair")].index
+        # require at least one of each
+        if len(non_pair_idx) == 0 or len(pair_idx) == 0:
+            continue
+        non_pairs = g.loc[non_pair_idx]
+        pairs = g.loc[pair_idx]
+
+        # produce every combination
+        for _, non_row in non_pairs.iterrows():
+            for _, pair_row in pairs.iterrows():
+                latent_non = np.asarray(non_row["latents"])
+                latent_pair = np.asarray(pair_row["latents"])
+                concat_latent = np.concatenate([latent_non, latent_pair], axis=0)
+
+                example = pair_row.to_dict()
+                example["latents"] = concat_latent
+                # discard timestep info as requested
+                if "timestep" in example:
+                    example.pop("timestep", None)
+                rows.append(example)
+
+    if not rows:
+        # return empty df with same columns minus 'timestep' to avoid downstream failures
+        cols = [c for c in df.columns if c != "timestep"]
+        return pd.DataFrame(columns=cols)
+    return pd.DataFrame(rows)
+
+
 def main():
     args = parse_args()
 
@@ -242,6 +295,9 @@ def main():
     if args.pairing == "concat":
         df = concat_latents_by_residue(df)
         print(f"Concatenated latents by residue, new dataset size: {len(df)}")
+    elif args.pairing == "loose_concat":
+        df = loose_concat_latents_by_residue(df)
+        print(f"Loose-concatenated latents by residue (all combinations, timestep removed), new dataset size: {len(df)}")
     else:
         # existing key-based filtering
         if "key" not in df.columns:
@@ -267,9 +323,10 @@ def main():
 
     model, metrics = train_and_evaluate(X_train, y_train, X_test, y_test, plot=args.plot, max_iter=args.max_iter)
 
-    save_coeffs(model, args.coefs_dir, args.coefs_filename, args.bias_filename)
+    if model is not None:
+        save_coeffs(model, args.coefs_dir, args.coefs_filename, args.bias_filename)
 
-    if args.results_json is not None:
+    if args.results_json is not None and metrics:
         out_dir = os.path.dirname(args.results_json)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
