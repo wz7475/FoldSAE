@@ -43,7 +43,7 @@ $PYTHON_RFDIFFUSION universal-diffsae/src/scripts/probes_per_intervention_indice
 config_name_no_ext="conf_${lowest_timestep}_${highest_timestep}_${probes_lambda_}_${num_of_coefs}"
 # config_name_no_ext="temp-.-for-.-testing"
 config_name_with_ext="${config_name_no_ext}.yaml"
-$PYTHON_RFDIFFUSION RFDiffSAE/scripts/generate_config.py --lowest_timestep $lowest_timestep \
+$PYTHON_RFDIFFUSION scripts/subcellular_interventions/generate_config.py --lowest_timestep $lowest_timestep \
   --highest_timestep $highest_timestep \
   --lambda_ $probes_lambda_ \
   --output_config_name $config_name_with_ext \
