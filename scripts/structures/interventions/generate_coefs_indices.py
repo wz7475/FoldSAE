@@ -60,17 +60,17 @@ def main():
     )
 
     parser.add_argument(
-        "--coef_helix",
+        "--coef_class_a",
         type=str,
         default="/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy",
-        help="Path to helix coefficients .npy file",
+        help="Path to first class coefficients .npy file",
     )
 
     parser.add_argument(
-        "--coef_beta",
+        "--coef_class_b",
         type=str,
         default="/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy",
-        help="Path to beta coefficients .npy file",
+        help="Path to second class coefficients .npy file",
     )
 
     parser.add_argument(
@@ -83,14 +83,15 @@ def main():
     parser.add_argument(
         "--output_path",
         type=str,
-        default="/home/wzarzecki/ds_secondary_struct/coefs_processed/thr_{threshold}.pt",
-        help="Output path for processed coefficients (use {threshold} placeholder for automatic naming)",
+        default="/home/wzarzecki/ds_secondary_struct/coefs_processed/thr_{threshold}_{first_class}.pt",
+        help="Output path for processed coefficients (use {threshold} and {first_class} placeholders for automatic naming)",
     )
 
     parser.add_argument(
-        "--use_values",
-        action="store_true",
-        help="Use actual coefficient values instead of signs",
+        "--first_class",
+        type=str,
+        default="a",
+        help="First class to steer towards",
     )
 
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -98,36 +99,38 @@ def main():
     args = parser.parse_args()
 
     # Check if input files exist
-    if not os.path.exists(args.coef_helix):
-        raise FileNotFoundError(f"Helix coefficients file not found: {args.coef_helix}")
-    if not os.path.exists(args.coef_beta):
-        raise FileNotFoundError(f"Beta coefficients file not found: {args.coef_beta}")
+    if not os.path.exists(args.coef_class_a):
+        raise FileNotFoundError(f"First class coefficients file not found: {args.coef_class_a}")
+    if not os.path.exists(args.coef_class_b):
+        raise FileNotFoundError(f"Second class coefficients file not found: {args.coef_class_b}")
 
-    # Format output path with threshold if placeholder is used
-    output_path = args.output_path.format(threshold=args.threshold)
+    # Format output path with threshold and first_class if placeholders are used
+    output_path = args.output_path.format(threshold=args.threshold, first_class=args.first_class)
 
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     if args.verbose:
-        print(f"Loading helix coefficients from: {args.coef_helix}")
-        print(f"Loading beta coefficients from: {args.coef_beta}")
+        print(f"Loading first class coefficients from: {args.coef_class_a}")
+        print(f"Loading second class coefficients from: {args.coef_class_b}")
         print(f"Using threshold: {args.threshold}")
-        print(f"Using {'actual values' if args.use_values else 'signs'}")
+        print(f"Steering towards first class: {args.first_class}")
         print(f"Output path: {output_path}")
 
     # Load coefficients
-    helix_coefs = read_npy_coefs_to_torch(args.coef_helix)
-    beta_coefs = read_npy_coefs_to_torch(args.coef_beta)
+    coefs_class_a = read_npy_coefs_to_torch(args.coef_class_a)
+    coefs_class_b = read_npy_coefs_to_torch(args.coef_class_b)
 
     if args.verbose:
-        print(f"Helix coefficients shape: {helix_coefs.shape}")
-        print(f"Beta coefficients shape: {beta_coefs.shape}")
+        print(f"First class coefficients shape: {coefs_class_a.shape}")
+        print(f"Second class coefficients shape: {coefs_class_b.shape}")
 
-    # Process coefficients
-    use_sign = not args.use_values  # Invert because default behavior is to use signs
+    # Process coefficients - use loaded coefficients directly
+    coefs_for_class_a = coefs_class_a
+    coefs_for_class_b = coefs_class_b
+
     indices, values = get_indices_and_values_for_class_a(
-        helix_coefs, beta_coefs, args.threshold
+        coefs_for_class_a, coefs_for_class_b, args.threshold
     )
 
     if args.verbose:

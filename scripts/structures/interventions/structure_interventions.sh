@@ -20,17 +20,29 @@ num_designs=${1:-2}
 
 # Coefficient processing arguments
 threshold=${13:-0.7}
-coef_helix=${14:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
-coef_beta=${15:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
-coefs_output_dir=${16:-"/home/wzarzecki/ds_10000x/coefs_processed"}
+first_class=${14:-"beta"}
+coef_helix=${15:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
+coef_beta=${16:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
+coefs_output_dir=${17:-"/home/wzarzecki/ds_10000x/coefs_processed"}
 
 # 0) generate indices for non-pair from coefficients
-generated_indices_path="$coefs_output_dir/thr_${threshold}.pt"
+generated_indices_path="$coefs_output_dir/thr_${threshold}_${first_class}.pt"
+
+# Determine coefficient order based on first class choice
+if [ "$first_class" = "helix" ]; then
+  coef_class_a="$coef_helix"
+  coef_class_b="$coef_beta"
+else  # beta
+  coef_class_a="$coef_beta"
+  coef_class_b="$coef_helix"
+fi
+
 $python scripts/structures/interventions/generate_coefs_indices.py \
-  --coef_helix "$coef_helix" \
-  --coef_beta "$coef_beta" \
+  --coef_class_a "$coef_class_a" \
+  --coef_class_b "$coef_class_b" \
   --threshold "$threshold" \
-  --output_path "$coefs_output_dir/thr_{threshold}.pt" \
+  --first_class "$first_class" \
+  --output_path "$coefs_output_dir/thr_{threshold}_{first_class}.pt" \
   --verbose
 
 # 1) generate config for RFdiffusion
