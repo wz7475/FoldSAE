@@ -46,7 +46,6 @@ def get_sae_conf_dict(
 ) -> dict | None:
     sae_hook_class_path = "rfdiffusion.sae.interventionhook.SAEInterventionHook"
     batch_size = 512
-    print(f"pair_indices_path: {pair_indices_path}, {type(pair_indices_path)}")
     return {
         "_target_": sae_hook_class_path,
         "sae_pair_path": sae_pair_weights_path if pair_indices_path else None,
