@@ -6,6 +6,7 @@
 
 set -euo pipefail
 
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 if [[ $# -lt 4 ]]; then
     echo "Usage: $0 <input_dir> <lambda_start> <lambda_end> <lambda_step> [prefix] [num_designs] [indices_path] [python_executable] [length] [seed]"
@@ -23,6 +24,11 @@ PYTHON_EXECUTABLE=${8:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
 LENGTH=${9:-150}
 SEED=${10:-1}
 
+LOG_DIR="./logs"
+mkdir -p "$LOG_DIR"
+SAFE_INPUT_DIR=$(echo "$INPUT_DIR" | sed 's#[/ ]#_#g')
+LOG_FILE="$LOG_DIR/generate_structures_input-${SAFE_INPUT_DIR}_lm${LAMBDA_START}_${LAMBDA_END}_s${LAMBDA_STEP}_pref-${PREFIX}_n${NUM_DESIGNS}_len${LENGTH}_seed${SEED}_${TIMESTAMP}.log"
+
 
 # Use Python for floating point range
 LAMBDAS=$(python3 -c "import numpy as np; print(' '.join([str(round(x, 6)) for x in np.arange($LAMBDA_START, $LAMBDA_END + $LAMBDA_STEP/2, $LAMBDA_STEP)]))")
@@ -30,17 +36,21 @@ LAMBDAS=$(python3 -c "import numpy as np; print(' '.join([str(round(x, 6)) for x
 echo "Sweeping lambda values: $LAMBDAS"
 
 
-for LAMBDA in $LAMBDAS; do
-    echo "\n=== Running for lambda: $LAMBDA ==="
-    CMD=("$(dirname "$0")/generate_structures.sh" \
-        "$INPUT_DIR" \
-        "$PREFIX" \
-        "$NUM_DESIGNS" \
-        "$LAMBDA" \
-        "$INDICES_PATH" \
-        "$PYTHON_EXECUTABLE" \
-        "$LENGTH" \
-        "$SEED")
-    echo "Executing: bash ${CMD[*]}"
-    bash "${CMD[@]}"
-done
+{
+    echo "Logging to: $LOG_FILE"
+    echo "Sweeping lambda values: $LAMBDAS"
+    for LAMBDA in $LAMBDAS; do
+        echo "\n=== Running for lambda: $LAMBDA ==="
+        CMD=("$(dirname "$0")/generate_structures.sh" \
+            "$INPUT_DIR" \
+            "$PREFIX" \
+            "$NUM_DESIGNS" \
+            "$LAMBDA" \
+            "$INDICES_PATH" \
+            "$PYTHON_EXECUTABLE" \
+            "$LENGTH" \
+            "$SEED")
+        echo "Executing: bash ${CMD[*]}"
+        bash "${CMD[@]}"
+    done
+} 2>&1 | tee -a "$LOG_FILE"
