@@ -73,6 +73,13 @@ def main():
         help="Path to second class coefficients .npy file",
     )
 
+
+    parser.add_argument(
+        "--bias_class_a",
+        type=str,
+        default="/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/bias.npy",
+    )
+
     parser.add_argument(
         "--threshold",
         type=float,
@@ -138,7 +145,7 @@ def main():
         print(f"Saving results to: {output_path}")
 
     # Save results
-    torch.save((values, indices), output_path)
+    torch.save((values, indices, coefs_for_class_a, torch.from_numpy(np.load(args.bias_class_a))), output_path)
 
     print(f"Successfully processed coefficients and saved to {output_path}")
     print(

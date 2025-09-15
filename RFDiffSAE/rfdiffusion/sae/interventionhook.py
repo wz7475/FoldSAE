@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Sequence
 
 import torch
 from torch.utils.data import DataLoader, TensorDataset
@@ -26,12 +26,16 @@ class SAEInterventionHook:
             self.device = torch.device("cuda")
         else:
             self.device = torch.device("cpu")
-        self.sae_for_pair = Sae.load_from_disk(sae_pair_path, self.device).to(
-            self.device
-        ) if sae_pair_path else None
-        self.sae_for_non_pair = Sae.load_from_disk(sae_non_pair_path, self.device).to(
-            self.device
-        ) if sae_non_pair_path else None
+        self.sae_for_pair = (
+            Sae.load_from_disk(sae_pair_path, self.device).to(self.device)
+            if sae_pair_path
+            else None
+        )
+        self.sae_for_non_pair = (
+            Sae.load_from_disk(sae_non_pair_path, self.device).to(self.device)
+            if sae_non_pair_path
+            else None
+        )
         self.batch_size = batch_size
         if self.sae_for_pair:
             self.sae_for_pair.eval()
@@ -57,18 +61,64 @@ class SAEInterventionHook:
         self.intervention_lambda_ = intervention_lambda
         self.apply_relu_after_intervention = apply_relu_after_intervention
 
-    def _update_sae_latents(
-        self,
-        latents: torch.Tensor, indices: Tuple[torch.Tensor, torch.Tensor], lambda_: int
+    @staticmethod
+    def _make_masked_multiplication(
+        latents: torch.Tensor,
+        coef_values: torch.Tensor,
+        indices: torch.Tensor,
+        lambda_: float,
+        apply_relu: bool,
+        residues_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        mask = torch.ones_like(latents)
-        coefs_values, indices = indices[0].to(self.device), indices[1].to(self.device)
-        for idx, val in zip(indices, coefs_values):
-            mask[:, idx] = val * lambda_ + 1
-        updated = latents * mask
-        if self.apply_relu_after_intervention:
-            return torch.relu(updated)
-        return updated
+        feature_scale = torch.ones_like(latents)
+        for idx, val in zip(indices, coef_values):
+            feature_scale[:, idx] = val * lambda_ + 1
+        multiplied = latents * feature_scale
+        if residues_mask is not None:
+            residues_mask = residues_mask.to(dtype=torch.bool, device=latents.device)
+            if apply_relu:
+                multiplied = torch.where(
+                    residues_mask.unsqueeze(-1), torch.relu(multiplied), latents
+                )
+            else:
+                multiplied = torch.where(
+                    residues_mask.unsqueeze(-1), multiplied, latents
+                )
+            return multiplied
+        if apply_relu:
+            return torch.relu(multiplied)
+        return multiplied
+
+    def _update_sae_latents(
+        self, latents: torch.Tensor, indices: Sequence[torch.Tensor], lambda_: int
+    ) -> torch.Tensor:
+        if len(indices) == 2:
+            return self._make_masked_multiplication(
+                latents,
+                indices[0].to(self.device),
+                indices[1].to(self.device),
+                lambda_,
+                self.apply_relu_after_intervention,
+            )
+        else:
+            steer_values, indices, class_a_ceofs, class_a_bias = (
+                indices[0].to(self.device),
+                indices[1].to(self.device),
+                indices[2].to(self.device),
+                indices[3].to(self.device),
+            )
+            mask_for_residues = (
+                torch.matmul(latents, class_a_ceofs.float()) + class_a_bias > 0.5
+            )
+          
+            return self._make_masked_multiplication(
+                latents,
+                steer_values.to(self.device),
+                indices.to(self.device),
+                lambda_,
+                self.apply_relu_after_intervention,
+                mask_for_residues,
+            )
 
     def _reconstruct_batch_with_sae(
         self,
