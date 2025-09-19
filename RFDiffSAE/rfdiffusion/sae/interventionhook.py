@@ -58,21 +58,26 @@ class SAEInterventionHook:
             if intervention_indices_for_non_pair is not None
             else None
         )
-        self.intervention_lambda_ = intervention_lambda
         self.apply_relu_after_intervention = apply_relu_after_intervention
 
     @staticmethod
     def _make_masked_multiplication(
         latents: torch.Tensor,
-        coef_values: torch.Tensor,
-        indices: torch.Tensor,
-        lambda_: float,
+        indices_to_reinforce: torch.Tensor,
+        indices_to_block: torch.Tensor,
+        low_level_lambda_: float, # must be positive value
         apply_relu: bool,
         residues_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        """
+        returns updated latents where residue mask is set to True
+        - increases value of latents
+        """
         feature_scale = torch.ones_like(latents)
-        for idx, val in zip(indices, coef_values):
-            feature_scale[:, idx] = val * lambda_ + 1
+        for idx in indices_to_reinforce:
+            feature_scale[:, idx] = 1 + low_level_lambda_
+        for idx in indices_to_block:
+            feature_scale[:, idx] = 1 - low_level_lambda_
         multiplied = latents * feature_scale
         if residues_mask is not None:
             residues_mask = residues_mask.to(dtype=torch.bool, device=latents.device)
@@ -90,41 +95,65 @@ class SAEInterventionHook:
         return multiplied
 
     def _update_sae_latents(
-        self, latents: torch.Tensor, indices: Sequence[torch.Tensor], lambda_: int
+        self,
+        latents: torch.Tensor,
+        coefs_for_intervention: Sequence[torch.Tensor],
+        lambda_: float,
     ) -> torch.Tensor:
-        if len(indices) == 2:
+        if len(coefs_for_intervention) == 2:
+            # older manner of making intervention with coefs and indices of ONE CLASSIFIER
             return self._make_masked_multiplication(
                 latents,
-                indices[0].to(self.device),
-                indices[1].to(self.device),
+                coefs_for_intervention[0].to(self.device),
+                coefs_for_intervention[1].to(self.device),
                 lambda_,
                 self.apply_relu_after_intervention,
             )
         else:
-            steer_values, indices, class_a_ceofs, class_a_bias = (
-                indices[0].to(self.device),
-                indices[1].to(self.device),
-                indices[2].to(self.device),
-                indices[3].to(self.device),
+            # recent manner of making intervention with indices and sign of DISCRIMANT COEFS FOR TWO CLASSIFIERS
+            positive_coefs_mask, negative_coefs_mask, coefs_a, bias_a = (
+                coefs_for_intervention[0].to(self.device),
+                coefs_for_intervention[1].to(self.device),
+                coefs_for_intervention[2].to(self.device),
+                coefs_for_intervention[3].to(self.device),
             )
-            mask_for_residues = (
-                torch.matmul(latents, class_a_ceofs.float()) + class_a_bias > 0.5
-            )
-          
-            return self._make_masked_multiplication(
-                latents,
-                steer_values.to(self.device),
-                indices.to(self.device),
-                lambda_,
-                self.apply_relu_after_intervention,
-                mask_for_residues,
-            )
+
+            is_A_class_mask = torch.sigmoid(torch.matmul(latents, coefs_a) + bias_a) >= 0.5
+            if lambda_ > 0:
+                # positive lambda means steering towards class A
+                # =>  we want to steer no-class-A residues => residues_mask=~is_A_class_mask
+                # => reinforce features positively correlated with being class A
+                updated_latens = self._make_masked_multiplication(
+                    latents,
+                    indices_to_reinforce=torch.nonzero(positive_coefs_mask, as_tuple=True)[0], # increase pos features
+                    indices_to_block=torch.nonzero(negative_coefs_mask, as_tuple=True)[0], # decrease neg features
+                    low_level_lambda_=lambda_,
+                    apply_relu=True,
+                    residues_mask=~is_A_class_mask,
+                )
+            elif lambda_ < 0:
+                # negative lambda means steering towards "others" class
+                # => we want to steer towards class A residues => residues_mask=is_A_class_mask
+                # => reinforce features negatively correlated with being class A
+                updated_latens = self._make_masked_multiplication(
+                    latents,
+                    indices_to_reinforce=torch.nonzero(negative_coefs_mask, as_tuple=True)[0],
+                    indices_to_block=torch.nonzero(positive_coefs_mask, as_tuple=True)[0],
+                    low_level_lambda_=-lambda_,
+                    apply_relu=True,
+                    residues_mask=is_A_class_mask, # change only class "a" residues towards other classes
+                )
+            else:
+                # do nothing when lambda_ == 0
+                updated_latens = latents
+            return updated_latens
+
 
     def _reconstruct_batch_with_sae(
         self,
         sae: Sae,
         batch: list[torch.Tensor],
-        indices_to_modify: Tuple[torch.Tensor, torch.Tensor] | None = None,
+        coefs_for_intervention: Sequence[torch.Tensor] | None = None,
         lambda_: int | None = None,
     ):
         batch = batch[0].to(self.device)
@@ -133,8 +162,8 @@ class SAEInterventionHook:
         top_acts, top_indices = sae.select_topk(pre_acts)
         buf = top_acts.new_zeros(top_acts.shape[:-1] + (sae.W_dec.mT.shape[-1],))
         latents = buf.scatter_(dim=-1, index=top_indices, src=top_acts)
-        if indices_to_modify is not None and lambda_ is not None:
-            latents = self._update_sae_latents(latents, indices_to_modify, lambda_)
+        if coefs_for_intervention is not None and lambda_ is not None:
+            latents = self._update_sae_latents(latents, coefs_for_intervention, lambda_)
             print("updated latents")
         else:
             print("not updated latens")

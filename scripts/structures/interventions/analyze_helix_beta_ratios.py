@@ -11,6 +11,32 @@ from collections import defaultdict
 import numpy as np
 
 
+def extract_helix_beta_counts_from_stride(stride_path_file: str):
+        # count occurrences of G/H/I in STR lines as helix indicator and E/B as beta indicator
+        ghi = 0
+        be = 0
+        all_residues = 0
+        if not os.path.exists(stride_path_file):
+            return 0, 0, 0
+        with open(stride_path_file) as f:
+            for line in f:
+                if line.startswith("STR"):
+                    # Count helix residues (G, H, I)
+                    ghi += line.count("G")
+                    ghi += line.count("H")
+                    ghi += line.count("I")
+                    # Count beta sheet residues (E, B)
+                    be += line.count("E")
+                    be += line.count("B")
+                    # Count all residues in STR line (total structure)
+                    all_residues += len([c for c in line[5:] if c.isalpha()])  # Skip "STR  " prefix
+                elif line.startswith("SEQ"):
+                    # Count all residues in SEQ line as backup
+                    seq_residues = len([c for c in line[5:] if c.isalpha()])  # Skip "SEQ  " prefix
+                    if all_residues == 0:  # Only use SEQ if STR didn't provide count
+                        all_residues = seq_residues
+        return ghi, be, all_residues
+
 def parse_directory_structure(base_dir, stride_dir=None):
     """
     Parse the directory structure to extract lambda values, thresholds, and classes.
@@ -48,7 +74,7 @@ def parse_directory_structure(base_dir, stride_dir=None):
                 
                 # Calculate helix/beta ratios for all PDB files in this directory
                 helices, betas, all_residues = [], [], []
-                
+
                 for pdb_file in pdb_files:
                     # Generate corresponding stride file path
                     stride_file = pdb_file.replace('.pdb', '.stride')
@@ -67,7 +93,7 @@ def parse_directory_structure(base_dir, stride_dir=None):
                     all_residues.append(total_residues)
                 
 
-                results[threshold][class_name][lambda_val] = [sum(helices), sum(betas), sum(all_residues)]
+                results[threshold][class_name][lambda_val] = [sum(helices), sum(betas), sum(all_residues), len(pdb_files)]
 
                 print(f"Processed files for lambda={lambda_val}, thr={threshold}, class={class_name}")
 
@@ -124,28 +150,3 @@ if __name__ == "__main__":
     main()
 
 
-def extract_helix_beta_counts_from_stride(stride_path_file: str):
-        # count occurrences of G/H/I in STR lines as helix indicator and E/B as beta indicator
-        ghi = 0
-        be = 0
-        all_residues = 0
-        if not os.path.exists(stride_path_file):
-            return 0, 0, 0
-        with open(stride_path_file) as f:
-            for line in f:
-                if line.startswith("STR"):
-                    # Count helix residues (G, H, I)
-                    ghi += line.count("G")
-                    ghi += line.count("H")
-                    ghi += line.count("I")
-                    # Count beta sheet residues (E, B)
-                    be += line.count("E")
-                    be += line.count("B")
-                    # Count all residues in STR line (total structure)
-                    all_residues += len([c for c in line[5:] if c.isalpha()])  # Skip "STR  " prefix
-                elif line.startswith("SEQ"):
-                    # Count all residues in SEQ line as backup
-                    seq_residues = len([c for c in line[5:] if c.isalpha()])  # Skip "SEQ  " prefix
-                    if all_residues == 0:  # Only use SEQ if STR didn't provide count
-                        all_residues = seq_residues
-        return ghi, be, all_residues

@@ -47,7 +47,16 @@ def create_plots(results, output_dir):
             beta_ratios = []
             
             for lambda_val in lambda_values:
-                helix_count, beta_count, total_residues = class_data[lambda_val]
+                entry = class_data[lambda_val]
+                # Support both 3-value and 4-value entries
+                if isinstance(entry, (list, tuple)):
+                    if len(entry) >= 3:
+                        helix_count, beta_count, total_residues = entry[0], entry[1], entry[2]
+                    else:
+                        # Fallback if malformed
+                        helix_count, beta_count, total_residues = 0, 0, 0
+                else:
+                    helix_count, beta_count, total_residues = 0, 0, 0
                 
                 if total_residues > 0:
                     helix_ratio = helix_count / total_residues
@@ -135,7 +144,15 @@ def create_summary_plot(results, output_dir):
                 beta_ratios = []
                 
                 for lambda_val in lambda_values:
-                    helix_count, beta_count, total_residues = class_data[lambda_val]
+                    entry = class_data[lambda_val]
+                    # Support both 3-value and 4-value entries
+                    if isinstance(entry, (list, tuple)):
+                        if len(entry) >= 3:
+                            helix_count, beta_count, total_residues = entry[0], entry[1], entry[2]
+                        else:
+                            helix_count, beta_count, total_residues = 0, 0, 0
+                    else:
+                        helix_count, beta_count, total_residues = 0, 0, 0
                     
                     if total_residues > 0:
                         helix_ratio = helix_count / total_residues
@@ -174,6 +191,71 @@ def create_summary_plot(results, output_dir):
     print(f"Summary plot saved: {summary_filepath}")
 
 
+def create_pdb_counts_plot(results, output_dir):
+    """Create a plot of PDB file counts vs lambda for each threshold/class combination."""
+    print("Creating PDB counts plot...")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    thresholds = sorted(results.keys(), key=float)
+
+    plt.figure(figsize=(12, 7))
+
+    for threshold in thresholds:
+        classes = list(results[threshold].keys())
+        for class_name in classes:
+            class_data = results[threshold][class_name]
+            lambda_values = sorted(class_data.keys(), key=float)
+
+            lambda_values_float = []
+            pdb_counts = []
+
+            for lambda_val in lambda_values:
+                entry = class_data[lambda_val]
+                if isinstance(entry, (list, tuple)) and len(entry) >= 4:
+                    count_pdb = entry[3]
+                else:
+                    # If older results without counts, skip plotting for this series
+                    count_pdb = None
+
+                if count_pdb is not None:
+                    lambda_values_float.append(float(lambda_val))
+                    pdb_counts.append(count_pdb)
+
+            if lambda_values_float:
+                plt.plot(
+                    lambda_values_float,
+                    pdb_counts,
+                    marker='o',
+                    linewidth=2,
+                    markersize=6,
+                    label=f"Thr {threshold} - {class_name}"
+                )
+
+    plt.xlabel('Lambda Values', fontsize=12)
+    plt.ylabel('Count of PDB files', fontsize=12)
+    plt.title('PDB file counts vs Lambda per Threshold/Class', fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.legend(fontsize=10, ncol=2)
+
+    # Add some padding to x-axis if there are any points
+    # Determine global x range from plotted lines
+    all_x = []
+    for line in plt.gca().get_lines():
+        all_x.extend(line.get_xdata())
+    if all_x:
+        x_min, x_max = min(all_x), max(all_x)
+        if x_max > x_min:
+            x_range = x_max - x_min
+            plt.xlim(x_min - x_range * 0.05, x_max + x_range * 0.05)
+
+    filepath = os.path.join(output_dir, "pdb_counts_over_lambda.png")
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"PDB counts plot saved: {filepath}")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate plots for helix to beta sheet ratios analysis')
     parser.add_argument('--results_file', required=True, help='JSON file containing the analysis results')
@@ -190,9 +272,13 @@ def main():
     
     if args.summary:
         create_summary_plot(results, args.output_dir)
+
+    # Always create PDB counts plot if counts are available in results
+    create_pdb_counts_plot(results, args.output_dir)
     
     print("Plot generation complete!")
 
 
 if __name__ == "__main__":
     main()
+
