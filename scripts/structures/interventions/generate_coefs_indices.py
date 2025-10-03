@@ -61,10 +61,16 @@ def main():
     )
 
     parser.add_argument(
+        "--first_class",
+        type=str,
+        help="name to append to config",
+    )
+
+    parser.add_argument(
         "--output_path",
         type=str,
-        default="/home/wzarzecki/ds_10000x/coefs_processed/thr_{threshold}.pt",
-        help="Output path for processed coefficients (use {threshold} placeholders for automatic naming)",
+        default="/home/wzarzecki/ds_secondary_struct/coefs_processed/thr_{threshold}_{first_class}.pt",
+        help="Output path for processed coefficients (use {threshold} and {first_class} placeholders for automatic naming)",
     )
 
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -81,7 +87,7 @@ def main():
             f"Second class coefficients file not found: {args.coef_class_b}"
         )
 
-    output_path = args.output_path.format(threshold=args.threshold)
+    output_path = args.output_path.format(threshold=args.threshold, first_class=args.first_class)
 
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

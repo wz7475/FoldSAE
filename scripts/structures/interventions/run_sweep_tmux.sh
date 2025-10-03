@@ -26,8 +26,16 @@ fi
 echo "Creating new tmux session: $SESSION_NAME"
 tmux new-session -d -s "$SESSION_NAME" -c "$BASE_DIR"
 
-# Generate lambda list from -2.5 to 2.5 inclusive with step 0.5
-LAMBDAS=$(python3 -c "import numpy as np; print(' '.join([str(x) for x in np.arange(-2.5, 2.5 + 1e-9, 0.5)]))")
+# Generate lambda list; ensure normalized formatting
+LAMBDAS=$(python3 - <<'PY'
+import numpy as np
+vals = np.arange(-5, 5 + 1e-9, 1)
+def norm(x: float) -> str:
+    s = ("%.*g" % (15, float(x)))
+    return s
+print(' '.join(norm(v) for v in vals))
+PY
+)
 
 echo "Setting up windows for lambdas: $LAMBDAS"
 
@@ -50,15 +58,15 @@ for LAMBDA in $LAMBDAS; do
         TMUX_TARGET="$SESSION_NAME:$win_idx"
     fi
 
-    echo "Setting up Tab $win_idx: CUDA_VISIBLE_DEVICES=$CUDA_IDX, lambda=$LAMBDA, threshold=0.3-1.0"
+    echo "Setting up Tab $win_idx: CUDA_VISIBLE_DEVICES=$CUDA_IDX, lambda=$LAMBDA, threshold=0.15-0.15"
     tmux send-keys -t "$TMUX_TARGET" "cd $BASE_DIR" Enter
 
     # Per-lambda output dir and log file
     OUT_DIR="./temp_interventions_sweep/lambda_${LAMBDA}"
-    LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s1_thr0.3_1.0_s0.1_classes-helix-beta_${TIMESTAMP}.log"
+    LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s1_thr0.15_0.15_s0.05_classes-helix-beta_${TIMESTAMP}.log"
 
     # Launch command in the window
-    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.3 1.0 0.1 'helix beta' '${OUT_DIR}' 45 2>&1 | tee -a ${LOG_FILE}" Enter
+    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.15 0.15 0.05 'helix beta' '${OUT_DIR}' 100 2>&1 | tee -a ${LOG_FILE}" Enter
 
     idx=$((idx+1))
     win_idx=$((win_idx+1))

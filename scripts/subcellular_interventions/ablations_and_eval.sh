@@ -13,7 +13,7 @@ PYTHON_BIOEMB=${9:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 # 1)
 # generate structures with RFDiff with ablated blocks
 # creates dir $output_dir/block_XXX/pdb for each block with pdb files
-bash scripts/rfdiffsae/ablations.sh $start_main $end_main $start_extra $end_extra 10 1 $output_dir $PYTHON_RFDIFFUSION
+bash scripts/ablations/ablations.sh $start_main $end_main $start_extra $end_extra 10 1 $output_dir $PYTHON_RFDIFFUSION
 
 # 2)
 # inverse-folding

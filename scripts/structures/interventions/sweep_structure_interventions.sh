@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# Normalize numeric strings to a canonical format (e.g., 0.10 -> 0.1)
+normalize_num() {
+  awk -v x="$1" 'BEGIN{printf "%.15g\n", x}'
+}
+
 # Grid search parameters
 lambda_start=${1:-0.0}
 lambda_stop=${2:-1.0}
@@ -34,8 +39,8 @@ mkdir -p "$input_dir"
 log_file="$input_dir/sweep_log.txt"
 echo "Starting structure interventions sweep at $(date)" > "$log_file"
 echo "Parameters:" >> "$log_file"
-echo "  Lambda range: $lambda_start to $lambda_stop (step $lambda_step)" >> "$log_file"
-echo "  Threshold range: $threshold_start to $threshold_stop (step $threshold_step)" >> "$log_file"
+echo "  Lambda range: $(normalize_num "$lambda_start") to $(normalize_num "$lambda_stop") (step $(normalize_num "$lambda_step"))" >> "$log_file"
+echo "  Threshold range: $(normalize_num "$threshold_start") to $(normalize_num "$threshold_stop") (step $(normalize_num "$threshold_step"))" >> "$log_file"
 echo "  First classes: $first_classes" >> "$log_file"
 echo "  Input dir: $input_dir" >> "$log_file"
 echo "  Num designs: $num_designs" >> "$log_file"
@@ -59,20 +64,22 @@ run_experiment() {
     local lambda=$1
     local threshold=$2
     local first_class=$3
+    local norm_lambda=$(normalize_num "$lambda")
+    local norm_threshold=$(normalize_num "$threshold")
     
-    echo "Running experiment: lambda=$lambda, threshold=$threshold, first_class=$first_class"
-    echo "Running experiment: lambda=$lambda, threshold=$threshold, first_class=$first_class" >> "$log_file"
+    echo "Running experiment: lambda=$norm_lambda, threshold=$norm_threshold, first_class=$first_class"
+    echo "Running experiment: lambda=$norm_lambda, threshold=$norm_threshold, first_class=$first_class" >> "$log_file"
     
     # Create experiment-specific output directory
-    local exp_dir="$input_dir/lambda_${lambda}_thr_${threshold}_${first_class}"
+    local exp_dir="$input_dir/lambda_${norm_lambda}_thr_${norm_threshold}_${first_class}"
     mkdir -p "$exp_dir"
     
     # Run the structure intervention script
     ./scripts/structures/interventions/structure_interventions.sh \
         "$num_designs" \
         "$indices_path_pair" \
-        "$lambda" \
-        "$threshold" \
+        "$norm_lambda" \
+        "$norm_threshold" \
         "$first_class" \
         "$sae_non_pair" \
         "$sae_pair" \

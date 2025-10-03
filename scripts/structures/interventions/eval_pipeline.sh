@@ -12,11 +12,11 @@ mkdir -p "$plot_dir"
 mkdir -p "$(dirname "$results_file")"
 
 # # 1) create stride annotations in stride dir with same dir structure as input dir
-# echo "Step 1: Creating STRIDE annotations..."
-# $python scripts/structures/utils/run_stride.py \
-#   --pdb_dir "$pdb_dir" \
-#   --stride_dir "$stride_dir" \
-#   --stride_binary "$stride_binary"
+echo "Step 1: Creating STRIDE annotations..."
+$python scripts/structures/utils/run_stride.py \
+  --pdb_dir "$pdb_dir" \
+  --stride_dir "$stride_dir" \
+  --stride_binary "$stride_binary"
 
 # 2) analyze helix beta ratios for all combinations
 echo "Step 2: Analyzing helix to beta sheet ratios..."
