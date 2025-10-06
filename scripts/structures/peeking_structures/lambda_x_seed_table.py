@@ -94,7 +94,7 @@ def collect_ratios(base_dir: str, stride_dir: str = None) -> Dict[float, Dict[st
                     stride_path = os.path.join(stride_dir, rel_path, stride_file)
 
                 helix_count, beta_count, _ = extract_helix_beta_counts_from_stride(stride_path)
-                ratio = 1.0
+                ratio = 10.0
                 if beta_count > 0:
                     ratio = helix_count / beta_count
                 ratios[threshold][class_name][seed_name][lambda_val] = ratio
