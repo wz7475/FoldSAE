@@ -83,8 +83,7 @@ def load_ds_from_dirs_independent_timesteps(
     return timesteps_datasets
 
 
-def get_normalized_latents(ds: Dataset) -> torch.Tensor:
-    latents: torch.Tensor = ds["values"]
+def get_normalized_latents(latents: torch.Tensor) -> torch.Tensor:
     latents = remove_dead_feature_tensor(latents)
     latents = torch.from_numpy(MinMaxScaler().fit_transform(latents))
     return latents
@@ -93,7 +92,7 @@ def get_normalized_latents(ds: Dataset) -> torch.Tensor:
 def get_dataset_latents_target_label(
     ds: Dataset, feature_type: str, target_label: str
 ) -> Dataset:
-    latents = get_normalized_latents(ds)
+    latents = get_normalized_latents(ds["values"])
     labels = get_numerical_target_ovo(ds[feature_type], target_label)
     ds = ds.from_dict({"values": latents, target_label: labels})
     ds.set_format(type="torch", columns=["values", target_label], dtype=torch.float32)
