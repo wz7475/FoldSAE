@@ -12,7 +12,7 @@ set -euo pipefail
 # 7: python_exec (optional; python for ProteinMPNN step)
 BASE_DIR=${1:-"temp_peeked_pdb"}
 PEEK_BASE_DIR=${2:-"/home/wzarzecki/ds_10000x/results/interventions/discriminant_coefs_2_100x/pdb"}
-IDS=${3:-"45 0 28 49 21"}
+IDS=${3:-"0 28 49 79 90 1 21 33 45 6"}
 ID_PREFIX=${4:-"design_"}
 SUBDIR_SUFFIX=${5:-"thr_0.15_beta"}
 STRIDE_BINARY=${6:-"stride/stride"}
@@ -73,10 +73,35 @@ if [[ ! -f "$RUN_IFOLD_SH" ]]; then
 fi
 
 echo "[3/3] Generating FASTA -> $FASTA_DIR"
-if [[ -n "$PYTHON_EXEC_FOR_MPNN" ]]; then
-  bash "$RUN_IFOLD_SH" "$PDB_DIR" "$FASTA_DIR" "$PYTHON_EXEC_FOR_MPNN"
+
+# If there are lambda_* subdirectories under PDB_DIR, run per subdir; otherwise, run once for PDB_DIR
+has_lambda_subdirs=false
+for d in "$PDB_DIR"/lambda_*; do
+  if [[ -d "$d" ]]; then
+    has_lambda_subdirs=true
+    break
+  fi
+done
+
+if [[ "$has_lambda_subdirs" == true ]]; then
+  for d in "$PDB_DIR"/lambda_*; do
+    [[ -d "$d" ]] || continue
+    subdir_name=$(basename "$d")
+    out_dir="$FASTA_DIR/$subdir_name"
+    mkdir -p "$out_dir"
+    echo "  - Processing $subdir_name"
+    if [[ -n "$PYTHON_EXEC_FOR_MPNN" ]]; then
+      bash "$RUN_IFOLD_SH" "$d" "$out_dir" "$PYTHON_EXEC_FOR_MPNN"
+    else
+      bash "$RUN_IFOLD_SH" "$d" "$out_dir"
+    fi
+  done
 else
-  bash "$RUN_IFOLD_SH" "$PDB_DIR" "$FASTA_DIR"
+  if [[ -n "$PYTHON_EXEC_FOR_MPNN" ]]; then
+    bash "$RUN_IFOLD_SH" "$PDB_DIR" "$FASTA_DIR" "$PYTHON_EXEC_FOR_MPNN"
+  else
+    bash "$RUN_IFOLD_SH" "$PDB_DIR" "$FASTA_DIR"
+  fi
 fi
 
 echo "Done. Outputs:"
