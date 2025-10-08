@@ -28,9 +28,9 @@ base_dir_for_config=${13:-"RFDiffSAE/config/saeinterventions/"}
 python=${14:-"/home/wzarzecki/miniforge3/envs/rf/bin/python"}
 prefix=${15:-"design"}
 length=${16:-150}
-coef_helix=${17:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
-coef_beta=${18:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
-coefs_output_dir=${19:-"/home/wzarzecki/ds_10000x/coefs_processed"}
+coef_helix=${17:-"/home/wzarzecki/ds_10000x_normalized/coefs/non_pair_helix_no_timestep/coef.npy"}
+coef_beta=${18:-"/home/wzarzecki/ds_10000x_normalized/coefs/non_pair_beta_no_timestep/coef.npy"}
+coefs_output_dir=${19:-"/home/wzarzecki/ds_10000x_normalized/coefs_processed"}
 
 # Create main output directory
 mkdir -p "$input_dir"

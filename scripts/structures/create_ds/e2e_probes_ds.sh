@@ -16,6 +16,7 @@ normalized_latents_path="$input_dir/normalized_latents"
 activations_dir="$input_dir/activations"
 stride_dir="$input_dir/stride"
 structure_datasets_dir="$input_dir/structures_datasets"
+merged_datasets_dir="$input_dir/structures_ds_merged"
 
 set -euo pipefail
 
@@ -50,18 +51,18 @@ echo "" > "$log_file";
 #done
 #echo "generated latents" >> "$log_file";
 
-# 3) normalize latents
-for shard in "$latents_path"/shard*; do
-  shard_name=$(basename "$shard")
-  output_shard="$normalized_latents_path/$shard_name"
-  echo "output shard $output_shard"
-  cmd="$PYTHON_SAE -m scripts.structures.create_ds.normalize_latents \
-    --input_shard \"$shard\" \
-    --output_shard \"$output_shard\""
-  echo "$cmd"
-  eval $cmd
-done
-echo "generated normalized_latents" >> "$log_file";
+## 3) normalize latents
+#for shard in "$latents_path"/shard*; do
+#  shard_name=$(basename "$shard")
+#  output_shard="$normalized_latents_path/$shard_name"
+#  echo "output shard $output_shard"
+#  cmd="$PYTHON_SAE -m scripts.structures.create_ds.normalize_latents \
+#    --input_shard \"$shard\" \
+#    --output_shard \"$output_shard\""
+#  echo "$cmd"
+#  eval $cmd
+#done
+#echo "generated normalized_latents" >> "$log_file";
 
 ## 4) run stride annotations
 #cmd="$PYTHON_SAE scripts/structures/utils/run_stride.py \
@@ -72,18 +73,24 @@ echo "generated normalized_latents" >> "$log_file";
 #eval $cmd
 #echo "generated stride annotations" >> "$log_file";
 
-# 5) add stride column to datasetsw
-for shard in "$normalized_latents_path"/shard*; do
-  shard_name=$(basename "$shard")
-  output_shard="$structure_datasets_dir/$shard_name"
-  echo "output shard $output_shard"
-  cmd="$PYTHON_SAE scripts/structures/create_ds/get_strcutures_annotatons.py \
-    --stride_dir \"$stride_dir\" \
-    --input_dataset_path \"$shard\" \
-    --output_dataset_path \"$output_shard\""
-  echo "$cmd"
-  eval $cmd
-done
-echo "genertated datasets with updates" >> "$log_file";
+## 5) add stride column to datasetsw
+#for shard in "$normalized_latents_path"/shard*; do
+#  shard_name=$(basename "$shard")
+#  output_shard="$structure_datasets_dir/$shard_name"
+#  echo "output shard $output_shard"
+#  cmd="$PYTHON_SAE scripts/structures/create_ds/get_strcutures_annotatons.py \
+#    --stride_dir \"$stride_dir\" \
+#    --input_dataset_path \"$shard\" \
+#    --output_dataset_path \"$output_shard\""
+#  echo "$cmd"
+#  eval $cmd
+#done
+#echo "genertated datasets with updates" >> "$log_file";
 
-
+# 6) merge datasets
+cmd="$PYTHON_SAE scripts/structures/create_ds/merge_datasets.py \
+  --base_dir \"$structure_datasets_dir\" \
+  --target_path \"$merged_datasets_dir\""
+echo "$cmd"
+eval "$cmd"
+echo "merged datasets" >> "$log_file";

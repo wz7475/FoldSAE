@@ -4,22 +4,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="/data/wzarzecki/SAEtoRuleRFDiffusion"
 PY_SCRIPT="$PROJECT_ROOT/scripts/structures/probes/train_probes.py"
-DATASETS_DIR="$HOME/ds_10000x/structures_ds_merged"
-BASE_COEFS_DIR="$HOME/ds_10000x/coefs"
-BASE_RESULTS_DIR="$HOME/ds_10000x/results/probes"
+DATASETS_DIR="/home/wzarzecki/ds_10000x_normalized/structures_ds_merged"
+BASE_COEFS_DIR="/home/wzarzecki/ds_10000x_normalized/coefs"
+BASE_RESULTS_DIR="/home/wzarzecki/ds_10000x_normalized/results/probes"
 PYTHON="/home/wzarzecki/miniforge3/envs/diffsae/bin/python"
 
 # pairings=("pair" "non_pair" "concat")
-pairings=("loose_concat")
+#pairings=("loose_concat")
+pairings=("non_pair" "pair")
 
 # add target sweep
 targets=("helix" "beta")
 # targets=("beta")
 
 timesteps=("none") # include case with no --timestep argument
-for i in $(seq 1 50); do
-  timesteps+=("$i")
-done
+#for i in $(seq 1 50); do
+#  timesteps+=("$i")
+#done
 
 
 

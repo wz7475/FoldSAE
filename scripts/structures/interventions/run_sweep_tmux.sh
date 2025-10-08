@@ -58,15 +58,15 @@ for LAMBDA in $LAMBDAS; do
         TMUX_TARGET="$SESSION_NAME:$win_idx"
     fi
 
-    echo "Setting up Tab $win_idx: CUDA_VISIBLE_DEVICES=$CUDA_IDX, lambda=$LAMBDA, threshold=0.15-0.15"
+    echo "Setting up Tab $win_idx: CUDA_VISIBLE_DEVICES=$CUDA_IDX, lambda=$LAMBDA, threshold=0.5-3.5"
     tmux send-keys -t "$TMUX_TARGET" "cd $BASE_DIR" Enter
 
     # Per-lambda output dir and log file
     OUT_DIR="./temp_interventions_sweep/lambda_${LAMBDA}"
-    LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s1_thr0.15_0.15_s0.05_classes-helix-beta_${TIMESTAMP}.log"
+    LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s1_thr0.5_3.5_s0.5_classes-helix-beta_${TIMESTAMP}.log"
 
     # Launch command in the window
-    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.15 0.15 0.05 'helix beta' '${OUT_DIR}' 100 2>&1 | tee -a ${LOG_FILE}" Enter
+    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.5 3.5 0.5 'beta' '${OUT_DIR}' 20 2>&1 | tee -a ${LOG_FILE}" Enter
 
     idx=$((idx+1))
     win_idx=$((win_idx+1))
