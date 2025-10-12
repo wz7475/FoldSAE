@@ -15,3 +15,4 @@ stride/stride
 structures_sweep
 temp*
 __pycache__
+/logs
