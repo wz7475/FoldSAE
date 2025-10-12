@@ -86,7 +86,7 @@ def main(conf: HydraConfig) -> None:
             make_deterministic(conf.inference.seed + i_des)
 
         start_time = time.time()
-        out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des}"
+        out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des + conf.inference.seed - 1}"
         if conf.inference.use_random_suffix_for_new_design:
             out_prefix += f"_{uuid4()}"
         structure_id = os.path.split(out_prefix)[1]

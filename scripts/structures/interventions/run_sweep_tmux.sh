@@ -5,6 +5,9 @@ set -euo pipefail
 # Script to run structure interventions sweep in tmux session with 3 tabs
 # Each tab runs with different CUDA device and lambda parameters
 
+# Parse command line arguments
+seed=${1:-1}
+
 # Session name
 SESSION_NAME="sweep_interventions"
 
@@ -66,7 +69,7 @@ for LAMBDA in $LAMBDAS; do
     LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s1_thr0.5_3.5_s0.5_classes-helix-beta_${TIMESTAMP}.log"
 
     # Launch command in the window
-    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.5 3.5 0.5 'beta' '${OUT_DIR}' 20 2>&1 | tee -a ${LOG_FILE}" Enter
+    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} 1 0.5 3.5 0.5 'beta' '${OUT_DIR}' 20 ${seed} 2>&1 | tee -a ${LOG_FILE}" Enter
 
     idx=$((idx+1))
     win_idx=$((win_idx+1))

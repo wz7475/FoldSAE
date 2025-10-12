@@ -23,6 +23,7 @@ length=${12:-150}
 coef_helix=${13:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
 coef_beta=${14:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
 coefs_output_dir=${15:-"/home/wzarzecki/ds_10000x/coefs_processed"}
+seed=${16:-1}
 
 # Generate config name from other args
 normalized_threshold=$(normalize_num "$threshold")
@@ -66,7 +67,7 @@ $python RFDiffSAE/scripts/run_inference.py \
   "inference.num_designs=$num_designs" \
   "inference.final_step=1" \
   "inference.use_random_suffix_for_new_design=False" \
-  "inference.seed=1" \
+  "inference.seed=$seed" \
   "saeinterventions=$output_config_name"
 
 # 3) run stride for evaluation

@@ -19,18 +19,19 @@ first_classes=${7:-"helix beta"}
 # Fixed parameters for all runs
 input_dir=${8:-"./temp_interventions_sweep"}
 num_designs=${9:-1}
+seed=${10:-1}
 
 # Additional parameters (rarely changed)
-indices_path_pair=${10:-""}
-sae_non_pair=${11:-"sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_non_pair/block4_non_pair"}
-sae_pair=${12:-""}
-base_dir_for_config=${13:-"RFDiffSAE/config/saeinterventions/"}
-python=${14:-"/home/wzarzecki/miniforge3/envs/rf/bin/python"}
-prefix=${15:-"design"}
-length=${16:-150}
-coef_helix=${17:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
-coef_beta=${18:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
-coefs_output_dir=${19:-"/home/wzarzecki/ds_10000x/coefs_processed"}
+indices_path_pair=${11:-""}
+sae_non_pair=${12:-"sae-ckpts/RFDiffSAE/patch_topk_expansion_factor16_k32_multi_topkFalse_auxk_alpha0.0lr1e-05_datawzarzeckiactivations_block4_non_pair/block4_non_pair"}
+sae_pair=${13:-""}
+base_dir_for_config=${14:-"RFDiffSAE/config/saeinterventions/"}
+python=${15:-"/home/wzarzecki/miniforge3/envs/rf/bin/python"}
+prefix=${16:-"design"}
+length=${17:-150}
+coef_helix=${18:-"/home/wzarzecki/ds_10000x/coefs/non_pair_helix_no_timestep/coef.npy"}
+coef_beta=${19:-"/home/wzarzecki/ds_10000x/coefs/non_pair_beta_no_timestep/coef.npy"}
+coefs_output_dir=${20:-"/home/wzarzecki/ds_10000x/coefs_processed"}
 
 # Create main output directory
 mkdir -p "$input_dir"
@@ -44,6 +45,7 @@ echo "  Threshold range: $(normalize_num "$threshold_start") to $(normalize_num 
 echo "  First classes: $first_classes" >> "$log_file"
 echo "  Input dir: $input_dir" >> "$log_file"
 echo "  Num designs: $num_designs" >> "$log_file"
+echo "  Seed: $seed" >> "$log_file"
 echo "" >> "$log_file"
 
 # Counter for total runs
@@ -90,7 +92,8 @@ run_experiment() {
         "$length" \
         "$coef_helix" \
         "$coef_beta" \
-        "$coefs_output_dir";
+        "$coefs_output_dir" \
+        "$seed";
     ((completed_runs+=1))
     echo "Progress: $completed_runs/$total_runs completed"
 }
