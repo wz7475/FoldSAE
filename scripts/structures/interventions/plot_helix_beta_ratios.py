@@ -74,24 +74,26 @@ def create_plots(results, output_dir):
             # Create the plot
             plt.figure(figsize=(10, 6))
             
-            # Plot both series
-            plt.plot(lambda_values_float, helix_ratios, 'o-', label='Alpha Helix / Total Residues', 
+            # Plot only the helix series (skip beta)
+            plt.plot(lambda_values_float, helix_ratios, 'o-', label='Helix / Total Residues', 
                     color='red', linewidth=2, markersize=6)
-            plt.plot(lambda_values_float, beta_ratios, 's-', label='Beta Sheet / Total Residues', 
-                    color='blue', linewidth=2, markersize=6)
+            # (beta series intentionally skipped)
             
             # Customize the plot
             plt.xlabel('Lambda Values', fontsize=12)
             plt.ylabel('Ratio to Total Residues', fontsize=12)
-            plt.title(f'Helix/Beta Ratios - Threshold: {threshold}, Class: {class_name}', fontsize=14)
+            plt.title(f'Helix Ratios - Threshold: {threshold}, Class: {class_name}', fontsize=14)
             plt.legend(fontsize=11)
             plt.grid(True, alpha=0.3)
             
-            # Set y-axis limits to better show the data
-            all_ratios = helix_ratios + beta_ratios
-            if all_ratios:
-                y_min = min(all_ratios) * 0.9
-                y_max = max(all_ratios) * 1.1
+            # Set y-axis limits to better show the data (use helix ratios only)
+            if helix_ratios:
+                y_min = min(helix_ratios) * 0.9
+                y_max = max(helix_ratios) * 1.1
+                # Guard against zero range
+                if y_max == y_min:
+                    y_min = max(0, y_min - 0.05)
+                    y_max = y_min + 0.1
                 plt.ylim(y_min, y_max)
             
             # Add some padding to x-axis
@@ -101,7 +103,7 @@ def create_plots(results, output_dir):
                         max(lambda_values_float) + x_range * 0.05)
             
             # Save the plot
-            filename = f"helix_beta_ratios_thr_{threshold}_class_{class_name}.png"
+            filename = f"helix_ratios_thr_{threshold}_class_{class_name}.png"
             filepath = os.path.join(output_dir, filename)
             plt.savefig(filepath, dpi=300, bbox_inches='tight')
             plt.close()
@@ -119,18 +121,25 @@ def create_summary_plot(results, output_dir):
     classes = set()
     for threshold in thresholds:
         classes.update(results[threshold].keys())
-    classes = sorted(classes)
+    # If a 'beta' class exists (case-insensitive), use only that single pane/column
+    beta_key = None
+    for c in sorted(classes):
+        if c.lower() == 'beta':
+            beta_key = c
+            break
+    if beta_key:
+        classes = [beta_key]
+    else:
+        classes = sorted(classes)
     
     n_thresholds = len(thresholds)
     n_classes = len(classes)
     
     fig, axes = plt.subplots(n_thresholds, n_classes, figsize=(5*n_classes, 4*n_thresholds))
     
-    # Handle case where we have only one threshold or one class
-    if n_thresholds == 1:
-        axes = axes.reshape(1, -1)
-    if n_classes == 1:
-        axes = axes.reshape(-1, 1)
+    # Ensure axes is a 2D array shaped (n_thresholds, n_classes)
+    axes = np.array(axes)
+    axes = axes.reshape(n_thresholds, n_classes)
     
     for i, threshold in enumerate(thresholds):
         for j, class_name in enumerate(classes):
@@ -141,50 +150,47 @@ def create_summary_plot(results, output_dir):
                 lambda_values = sorted(class_data.keys(), key=float)
                 
                 helix_ratios = []
-                beta_ratios = []
                 
                 for lambda_val in lambda_values:
                     entry = class_data[lambda_val]
                     # Support both 3-value and 4-value entries
                     if isinstance(entry, (list, tuple)):
                         if len(entry) >= 3:
-                            helix_count, beta_count, total_residues = entry[0], entry[1], entry[2]
+                            helix_count, _, total_residues = entry[0], entry[1], entry[2]
                         else:
-                            helix_count, beta_count, total_residues = 0, 0, 0
+                            helix_count, total_residues = 0, 0
                     else:
-                        helix_count, beta_count, total_residues = 0, 0, 0
+                        helix_count, total_residues = 0, 0
                     
                     if total_residues > 0:
                         helix_ratio = helix_count / total_residues
-                        beta_ratio = beta_count / total_residues
                     else:
                         helix_ratio = 0
-                        beta_ratio = 0
                     
                     helix_ratios.append(helix_ratio)
-                    beta_ratios.append(beta_ratio)
                 
                 lambda_values_float = [float(x) for x in lambda_values]
                 
-                ax.plot(lambda_values_float, helix_ratios, 'o-', label='Helix', 
+                # Plot only helix series on summary grid
+                ax.plot(lambda_values_float, helix_ratios, 'o-', 
                        color='red', linewidth=2, markersize=4)
-                ax.plot(lambda_values_float, beta_ratios, 's-', label='Beta', 
-                       color='blue', linewidth=2, markersize=4)
+                # (beta series intentionally skipped)
                 
-                ax.set_title(f'Thr: {threshold}, Class: {class_name}', fontsize=10)
+                # Title and labels
+                ax.set_title('Ratio: alpha helices / total residues', fontsize=15)
                 ax.grid(True, alpha=0.3)
                 ax.legend(fontsize=8)
                 
                 if i == n_thresholds - 1:  # Bottom row
                     ax.set_xlabel('Lambda', fontsize=10)
-                if j == 0:  # Left column
-                    ax.set_ylabel('Ratio', fontsize=10)
+                # if j == 0:  # Left column
+                #     ax.set_ylabel('Ratio', fontsize=10)
             else:
                 ax.text(0.5, 0.5, 'No Data', ha='center', va='center', transform=ax.transAxes)
                 ax.set_title(f'Thr: {threshold}, Class: {class_name}', fontsize=10)
     
     plt.tight_layout()
-    summary_filepath = os.path.join(output_dir, "helix_beta_ratios_summary.png")
+    summary_filepath = os.path.join(output_dir, "helix_ratios_summary.png")
     plt.savefig(summary_filepath, dpi=300, bbox_inches='tight')
     plt.close()
     

@@ -46,26 +46,39 @@ def plot_stacked_bars(results: dict, output_dir: str, title: str | None = None):
     x = range(len(blocks))
     width = 0.8
 
-    plt.figure(figsize=(max(8, len(blocks) * 0.6), 6))
-    p1 = plt.bar(x, helix, width, label='Alpha helix', color='#1f77b4')
-    p2 = plt.bar(x, beta, width, bottom=helix, label='Beta sheet', color='#ff7f0e')
-    bottom_other = [h + b for h, b in zip(helix, beta)]
-    p3 = plt.bar(x, other, width, bottom=bottom_other, label='Other', color='#2ca02c')
+    # Compute doubled font size based on matplotlib default font size
+    base_font = matplotlib.rcParams.get('font.size', 10.0)
+    big_font = float(base_font) * 2.0
 
-    plt.xticks(list(x), block_labels, rotation=45, ha='right')
-    plt.ylabel('Residue count')
-    plt.xlabel('Block')
-    if title:
-        plt.title(title)
-    else:
-        plt.title('Secondary structure composition per block')
-    plt.legend()
-    plt.tight_layout()
+    # Temporarily apply larger font sizes (titles, labels, ticks, legend, suptitle)
+    with matplotlib.rc_context({
+        'axes.titlesize': big_font,
+        'axes.labelsize': big_font,
+        'xtick.labelsize': big_font,
+        'ytick.labelsize': big_font,
+        'legend.fontsize': big_font,
+        'figure.titlesize': big_font
+    }):
+        plt.figure(figsize=(max(8, len(blocks) * 0.6), 6))
+        p1 = plt.bar(x, helix, width, label='Alpha helix', color='#1f77b4')
+        p2 = plt.bar(x, beta, width, bottom=helix, label='Beta sheet', color='#ff7f0e')
+        bottom_other = [h + b for h, b in zip(helix, beta)]
+        p3 = plt.bar(x, other, width, bottom=bottom_other, label='Other', color='#2ca02c')
 
-    out_path = os.path.join(output_dir, 'ablation_blocks_stacked_bars.png')
-    plt.savefig(out_path, dpi=200)
-    plt.close()
-    print(f"Saved plot: {out_path}")
+        plt.xticks(list(x), block_labels, rotation=45, ha='right')
+        plt.ylabel('Residue count')
+        plt.xlabel('Block')
+        if title:
+            plt.title(title)
+        else:
+            plt.title('Secondary structure composition per block')
+        plt.legend()
+        plt.tight_layout()
+
+        out_path = os.path.join(output_dir, 'ablation_blocks_stacked_bars.png')
+        plt.savefig(out_path, dpi=200)
+        plt.close()
+        print(f"Saved plot: {out_path}")
 
 
 def main():
