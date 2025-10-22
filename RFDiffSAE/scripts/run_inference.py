@@ -20,8 +20,6 @@ import os
 import time
 import pickle
 from uuid import uuid4
-from datasets import Dataset
-
 import torch
 from omegaconf import OmegaConf
 import hydra
@@ -36,7 +34,7 @@ import random
 import glob
 
 
-def make_deterministic(seed=0):
+def make_deterministic(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -45,8 +43,9 @@ def make_deterministic(seed=0):
 @hydra.main(version_base=None, config_path="../config", config_name="base")
 def main(conf: HydraConfig) -> None:
     log = logging.getLogger(__name__)
-    if conf.inference.seed:
-        make_deterministic(conf.inference.seed)
+    if conf.inference.make_deterministic:
+        make_deterministic(seed=0) # hard seed same for sampler initialization, later each design will it's own seed for sampling
+    seed = conf.inference.seed
 
     # Check for available GPU and print result of check
     if torch.cuda.is_available():
@@ -63,30 +62,29 @@ def main(conf: HydraConfig) -> None:
     sampler = iu.sampler_selector(conf)
 
     # Loop over number of designs to sample.
-    design_startnum = sampler.inf_conf.design_startnum
-    if sampler.inf_conf.design_startnum == -1:
-        existing = glob.glob(sampler.inf_conf.output_prefix + "*.pdb")
-        indices = [-1]
-        for e in existing:
-            print(e)
-            m = re.match(".*_(\d+)\.pdb$", e)
-            print(m)
-            if not m:
-                continue
-            m = m.groups()[0]
-            indices.append(int(m))
-        design_startnum = max(indices) + 1
+    existing = glob.glob(sampler.inf_conf.output_prefix + "*.pdb")
+    indices = [-1]
+    for e in existing:
+        print(e)
+        m = re.match(r".*_(\d+)\.pdb$", e)
+        print(m)
+        if not m:
+            continue
+        m = m.groups()[0]
+        indices.append(int(m))
+    biggest_found_idx = max(indices) + 1
 
 
     activations_for_all_designs = {}
     save_activs_every = getattr(conf.activations, "save_activations_after_n_designs", 1)
     shard_idx = 0
-    for i_des in range(design_startnum, design_startnum + sampler.inf_conf.num_designs):
-        if conf.inference.seed:
-            make_deterministic(conf.inference.seed + i_des)
+    # Allow specifying start_design_index to generate specific design numbers
+    for i_des in range(seed, seed + sampler.inf_conf.num_designs):
+        if conf.inference.make_deterministic:
+            make_deterministic(i_des)
 
         start_time = time.time()
-        out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des + conf.inference.seed - 1}"
+        out_prefix = f"{sampler.inf_conf.output_prefix}_{i_des}"
         if conf.inference.use_random_suffix_for_new_design:
             out_prefix += f"_{uuid4()}"
         structure_id = os.path.split(out_prefix)[1]

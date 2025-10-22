@@ -8,7 +8,6 @@ defaults:
 inference:
   input_pdb: null
   num_designs: 10
-  design_startnum: 0
   ckpt_override_path: null
   symmetry: null
   recenter: True
@@ -26,7 +25,8 @@ inference:
   schedule_directory_path: null
   model_directory_path: null
   use_random_suffix_for_new_design: true
-  seed: null
+  seed: 0
+  make_deterministic: true
   write_trb: False
 
 contigmap:
