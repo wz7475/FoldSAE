@@ -11,7 +11,8 @@
 #   final_step        Final step for inference (default: 1)  
 #   config_name         name of yaml config of RFdiffusion storing params of which block to store activations
 #   log_file          Path to log file (default: /home/wzarzecki/logs/probes_ds.log)
-#   PYTHON_RFDIFFUSION Path to Python interpreter (default: /home/wzarzecki/miniforge3/envs/rf/bin/python)
+#   PYTHON_RFDIFFUSION Path to Python for RFDiffusion (default: /home/wzarzecki/miniforge3/envs/rf/bin/python)
+#   PYTHON_SAE Path to Python used for SAE training (default: /home/wzarzecki/miniforge3/envs/diffsae/bin/python)
 #
 # The script:
 # 1. Sets up directory paths for PDB files and activations
@@ -27,12 +28,14 @@ input_dir=${2:-/home/wzarzecki/ds_10000x_block_2}
 protein_length=${3:-150}
 final_step=${4:-1}
 config_name=${5:-block2_10_token_10th_timestep}
-log_file=${14:-/home/wzarzecki/logs/probes_ds.log}
+log_file=${14:-/home/wzarzecki/logs/activations.log}
 PYTHON_RFDIFFUSION=${14:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
+PYTHON_SAE=${14:-/home/wzarzecki/miniforge3/envs/diffsae/bin/python}
 
 # paths variables
 pdb_dir="$input_dir/pdb"
 activations_dir="$input_dir/activations"
+merged_activations_dir="$input_dir/merged_activations"
 
 set -euo pipefail
 
@@ -50,3 +53,11 @@ $PYTHON_RFDIFFUSION RFDiffSAE/scripts/run_inference.py \
 " activations=$config_name" \
  "activations.dataset_path=$activations_dir" ;
 echo "generated structures and collected activations from $num_designs proteins" >> log_file;
+
+# 2) merge them into single dataset
+cmd="$PYTHON_SAE scripts/tools/merge_datasets.py \
+   --base_dir $activations_dir \
+   --target_path $merged_activations_dir "
+ echo "$cmd"
+ eval "$cmd"
+ echo "merged datasets" >> $log_file;

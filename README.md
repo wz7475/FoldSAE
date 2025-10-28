@@ -35,7 +35,7 @@ Train SAE in unsupervised manner on collected activations
 
 #### Collect activations for chosen block
 ```shell
-bash ./scripts/sae/collect_activations.sh [num_designs] [input_dir] [protein_length] [config_name] [final_step] [log_file] [PYTHON_RFDIF]
+bash ./scripts/sae/collect_activations.sh [num_designs] [input_dir] [protein_length] [config_name] [final_step] [log_file] [PYTHON_RFDIF] [PYTHON_SAE]
 ```
 put config into `RFDiffSAE/config/activations` it may look like
 ```yaml

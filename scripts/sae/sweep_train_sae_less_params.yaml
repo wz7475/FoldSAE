@@ -18,7 +18,7 @@ parameters:
   dataset_path:
     value: ./temp_activations_block2
   hookpoints:
-    values: [block4_non_pair, block4_pair]
+    values: [block2_non_pair, block2_pair]
   effective_batch_size:
     value: 4096
   k:

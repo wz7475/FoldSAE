@@ -1,7 +1,7 @@
 import argparse
 from glob import glob
 
-from datasets import Dataset, concatenate_datasets
+from datasets import Dataset, concatenate_datasets, disable_caching
 
 
 def merge_all_datasets(base_dir: str, target_path: str) -> None:
@@ -52,4 +52,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    disable_caching()
     merge_all_datasets(args.base_dir, args.target_path)

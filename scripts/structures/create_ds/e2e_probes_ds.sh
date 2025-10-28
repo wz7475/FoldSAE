@@ -94,7 +94,7 @@ echo "generated structures and collected activations from $num_designs proteins"
  echo "genertated datasets with updates" >> "$log_file";
 
  # 6) merge datasets
- cmd="$PYTHON_SAE scripts/structures/create_ds/merge_datasets.py \
+ cmd="$PYTHON_SAE scripts/tools/merge_datasets.py \
    --base_dir \"$structure_datasets_dir\" \
    --target_path \"$merged_datasets_dir\""
  echo "$cmd"
