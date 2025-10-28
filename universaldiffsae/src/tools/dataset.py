@@ -114,6 +114,12 @@ def create_iterable_dataset(
     )
 
 
+def load_ds_from_one_dir(path: str, dtype, columns: list[str]) -> Dataset:
+    ds = Dataset.load_from_disk(path)
+    ds.set_format(type="torch", columns=columns, dtype=dtype)
+    return ds
+
+
 def get_shards_paths(base_dir):
     all_directories = os.listdir(base_dir)
     shards_paths = []

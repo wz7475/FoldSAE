@@ -16,16 +16,16 @@ command:
 
 parameters:
   dataset_path:
-    value: ./temp_activations_block2
+    value: /home/wzarzecki/ds_10000x_block_2/merged_activations
   hookpoints:
     values: [block2_non_pair, block2_pair]
   effective_batch_size:
     value: 4096
   k:
-    values: [32, 64, 128]
+    values: [32]
   expansion_factor:
-    values: [4, 8, 16]
+    values: [4]
   max_trainer_steps:
-    value: 500
+    value: 5000
   lr:
-     values: [0.005, 0.0001, 0.0005, 0.00001]
+     values: [0.005]

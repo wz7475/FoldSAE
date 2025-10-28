@@ -1,24 +1,23 @@
 method: grid
-project: RFDiffSAE
+project: SAE_main_02
 entity: RFDiffSAE
-name: new_activations
+name: sae_main_02_5k_struct
 
 
-program: universal-diffsae/src/scripts/train.py
+program: universaldiffsae/src/scripts/train.py
 
 command:
   - ${env}
-  - CUDA_VISIBLE_DEVICES=0
   - SAE_DISABLE_TRITON=1
-  - python
+  - /home/wzarzecki/miniforge3/envs/diffsae/bin/python
   - ${program}
   - ${args}
 
 parameters:
   dataset_path:
-    value: /data/wzarzecki/activations_1200
+    value: /home/wzarzecki/ds_10000x_block_2/merged_activations
   hookpoints:
-    values: [block4_non_pair, block4_pair]
+    values: [block2_non_pair, block2_pair]
   effective_batch_size:
     value: 4096
   k:

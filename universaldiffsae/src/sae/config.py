@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from simple_parsing import Serializable, list_field
@@ -134,3 +135,19 @@ class CacheActivationsRunnerConfig:
             self.new_cached_activations_path = f"activations/{self.dataset_name.split('/')[-1]}/{self.model_name.split('/')[-1]}/"
         if isinstance(self.hook_names, str):
             self.hook_names = [self.hook_names]
+
+
+@dataclass
+class RunConfig(TrainConfig):
+    mixed_precision: str = "no"
+
+    seed: int = 42
+    """Random seed for shuffling the dataset."""
+    device: str = "cuda"
+    num_epochs: int = 1
+    activation_column: str = "activations"
+    activations_type_column: str = "key"
+    activations_type: str = "block2_non_pair"
+    ds_with_block_and_timestep_dirs: bool = False
+    n_random_activation: Optional[int] = None
+    max_trainer_steps: Optional[int] = None

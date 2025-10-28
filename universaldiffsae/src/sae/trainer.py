@@ -12,21 +12,20 @@ from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from transformers import get_scheduler
 
 from src.sae.utils import geometric_median
 
-from .config import TrainConfig
+from .config import RunConfig
 from .sae import Sae
 
 
 class SaeTrainer:
-    def __init__(self, cfg: TrainConfig, dataset_dict: dict[str, Dataset]):
+    def __init__(self, cfg: RunConfig, dataset_dict: dict[str, Dataset]):
         self.cfg = cfg
         self.dataset_dict = dataset_dict
-        # self.num_examples = len(dataset_dict[list(dataset_dict.keys())[0]])
+        self.num_examples = len(dataset_dict[list(dataset_dict.keys())[0]])
         input_widths = {
-            hook: next(iter(dataset))["values"].shape[-1]
+            hook: next(iter(dataset))[cfg.activation_column].shape[-1]
             for hook, dataset in self.dataset_dict.items()
         }
         # self.sample_size = dataset_dict[list(dataset_dict.keys())[0]][0][
@@ -138,8 +137,6 @@ class SaeTrainer:
         )
         print(f"Number of SAE parameters: {num_sae_params:_}")
 
-        num_batches = (100000000) * self.cfg.num_epochs
-
         device = torch.device(self.cfg.device)
         dataloaders = {
             hook: DataLoader(
@@ -156,7 +153,7 @@ class SaeTrainer:
             desc="Training",
             disable=not rank_zero,
             initial=self.global_step,
-            # total=num_batches,
+            total=self.num_examples // self.batch_size,
         )
 
         did_fire = {
@@ -189,7 +186,7 @@ class SaeTrainer:
                 hidden_dict = {}
                 start_loading = time()
                 for hook, batch in zip(dataloaders.keys(), batch_dict):
-                    hidden_dict[hook] = batch["values"]
+                    hidden_dict[hook] = batch[self.cfg.activation_column]
                 data_loading_time = time() - start_loading
 
                 # Bookkeeping for dead feature detection

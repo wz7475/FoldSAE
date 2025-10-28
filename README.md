@@ -54,11 +54,13 @@ run
 ```shell
 python universaldiffsae/src/scripts/train.py --dataset_path=/home/wzarzecki/ds_10000x_block_2/activations   --effective_batch_size=4096 --expansion_factor=4 --hookpoints=block4_non_pair --k=32 --lr=0.005 --max_trainer_steps=500 --wandb_project=SAE_main_02
 ```
-for details check `RunConfig` in this scrip
+for details check `RunConfig` in `universaldiffsae/src/sae/config.py`
 
 to automate running SAE trainig with various hyper-params run grid search, you may use wandb setup
 ```shell
 wandb sweep scripts/sae/sweep_train_sae.yaml
 wandb agent <sweep_id>
+#or
+bash scripts/sae/tmux_wandb_agents.sh <sweep_id_with_prefix> <cuda_idx> <num_of_agents>
 ```
 

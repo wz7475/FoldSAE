@@ -5,33 +5,15 @@ Train sparse autoencoders on activations from a diffusion model.
 import os
 import sys
 from contextlib import nullcontext, redirect_stdout
-from dataclasses import dataclass
-from typing import Optional
-
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 import torch
 import torch.distributed as dist
 from simple_parsing import parse
 
-from src.sae.config import TrainConfig
+from src.sae.config import RunConfig
 from src.sae.trainer import SaeTrainer
-from src.tools.dataset import load_datasets_from_dir_of_dirs
-
-
-@dataclass
-class RunConfig(TrainConfig):
-    mixed_precision: str = "no"
-
-    max_examples: int | None = None
-    """Maximum number of examples to use for training."""
-
-    seed: int = 42
-    """Random seed for shuffling the dataset."""
-    device: str = "cuda"
-    num_epochs: int = 1
-    n_random_activation: Optional[int] = None
-    max_trainer_steps: Optional[int] = None
+from src.tools.dataset import load_datasets_from_dir_of_dirs, load_ds_from_one_dir
 
 
 def run():
@@ -60,10 +42,12 @@ def run():
     # Awkward hack to prevent other ranks from duplicating data preprocessing
     dataset_dict = {}
     if not ddp or rank == 0:
-        dataset = load_datasets_from_dir_of_dirs(os.path.join(args.dataset_path[0], args.hookpoints[0]), dtype, columns=["values"])
+        if args.ds_with_block_and_timestep_dirs:
+            dataset = load_datasets_from_dir_of_dirs(os.path.join(args.dataset_path[0], args.hookpoints[0]), dtype, columns=[args.activation_column])
+        else:
+            dataset = load_ds_from_one_dir(args.dataset_path[0], dtype, columns=[args.activation_column, args.activations_type_column])
+            dataset = dataset.filter(lambda row: row[args.activations_type_column] == args.activations_type)
         dataset = dataset.shuffle(args.seed)
-        if limit := args.max_examples:
-            dataset = dataset.select(range(limit))
         dataset_dict[args.hookpoints[0]] = dataset
 
 
