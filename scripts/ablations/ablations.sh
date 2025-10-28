@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Positional arguments (defaults shown in parentheses):
+# - start_main, end_main: range of main blocks to ablate (use -1 -1 to skip main ablations)
+# - start_extra, end_extra: range of extra blocks to ablate (use -1 -1 to skip extra ablations)
+# - num_designs (1): number of designs to generate
+# - final_step (1): final step index for inference
+# - output_dir (/raid/rfdiffsae/ablated_outputs): directory for outputs
+# - PYTHON_EXEC (/home/wzarzecki/miniforge3/envs/rf/bin/python): Python executable to run the script
+# - reference_dir (true): if true, also run the reference (no-ablations) job
+
+# Notes:
+# - A reference run (no ablations) is executed when reference_dir is true (default), or when all four block-range args are -1 -1 -1 -1.
+# - To ablate only main blocks, set start_extra and end_extra to -1 -1.
+# - To ablate only extra blocks, set start_main and end_main to -1 -1.
+
 start_main=$1
 end_main=$2
 start_extra=$3
@@ -7,7 +21,7 @@ end_extra=$4
 num_designs=${5:-1}
 final_step=${6:-1}
 output_dir=${7:-/raid/rfdiffsae/ablated_outputs}
-PYTHON_EXEC=${8:-/home/wzarzecki/miniforge3/envs/rf124/bin/python}
+PYTHON_EXEC=${8:-/home/wzarzecki/miniforge3/envs/rf/bin/python}
 reference_dir=${9:-true}
 
 mkdir -p "$output_dir"

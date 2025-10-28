@@ -1,10 +1,10 @@
 method: grid
-project: RFDiffSAE
+project: SAE_main_02
 entity: RFDiffSAE
-name: activations_78GB
+name: test_sweep_1
 
 
-program: universal-diffsae/src/scripts/train.py
+program: universaldiffsae/src/scripts/train.py
 
 command:
   - ${env}
@@ -16,7 +16,7 @@ command:
 
 parameters:
   dataset_path:
-    value: /data/wzarzecki/activations
+    value: ./temp_activations_block2
   hookpoints:
     values: [block4_non_pair, block4_pair]
   effective_batch_size:
@@ -26,6 +26,6 @@ parameters:
   expansion_factor:
     values: [4, 8, 16]
   max_trainer_steps:
-    value: 50000
+    value: 500
   lr:
      values: [0.005, 0.0001, 0.0005, 0.00001]

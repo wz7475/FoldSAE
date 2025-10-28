@@ -8,7 +8,6 @@ from contextlib import nullcontext, redirect_stdout
 from dataclasses import dataclass
 from typing import Optional
 
-from src.tools.dataset import load_datasets_from_dir_of_dirs
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 import torch
@@ -17,6 +16,7 @@ from simple_parsing import parse
 
 from src.sae.config import TrainConfig
 from src.sae.trainer import SaeTrainer
+from src.tools.dataset import load_datasets_from_dir_of_dirs
 
 
 @dataclass

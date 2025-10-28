@@ -55,7 +55,7 @@ CUDA_VISIBLE_DEVICES="$DEVICE_IDX_FOR_OLD_GPU" CUDA_VISIBLE_DEVICES=2 bash scrip
 
 # 5 "update datasets with labels from classifiers"
 echo "adding labels to HF datasets ..."
-$PYTHON_RFDIFFUSION scripts/sae/update_sae_latents_dataset.py \
+$PYTHON_RFDIFFUSION scripts/subcellular_interventions/update_sae_latents_dataset.py \
 #	--base-dir $input_dir
 
 # 6) prepare specific datasets
