@@ -1,7 +1,7 @@
 method: grid
 project: SAE_main_02
 entity: RFDiffSAE
-name: sae_main_02_5k_struct
+name: sae_main_02_5k_struct_non_pair
 
 
 program: universaldiffsae/src/scripts/train.py
@@ -17,7 +17,9 @@ parameters:
   dataset_path:
     value: /home/wzarzecki/ds_10000x_block_2/merged_activations
   hookpoints:
-    values: [block2_non_pair, block2_pair]
+    values: [block2_non_pair]
+  activations_type:
+    values: [block2_non_pair]
   effective_batch_size:
     value: 4096
   k:
