@@ -74,4 +74,7 @@ bash scripts/structures/create_ds/probes_ds_from_block_act.sh <input_dir> <block
 ```
 
 #### train probes on it
-
+for secondary structure you may use
+```shell
+bash scripts/structures/probes/probes_sweep.sh <dataset_dir> <dir_to_store_coefs> <dir_to_store_results> <python_bin>
+```

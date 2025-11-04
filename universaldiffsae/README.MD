@@ -88,3 +88,27 @@ python src/scripts/train.py --dataset_path <path_to_dataset>
 ```
 
 For all run arguments, see `TrainConfig` in `src/sae/config.py`.
+
+
+## Running probe sweeps with stdin overrides
+
+The sweep script at `scripts/structures/probes/probes_sweep.sh` supports overriding its defaults via stdin.
+
+Examples:
+
+```bash
+# Override directories and restrict to a single pairing/target
+printf '%s\n' \
+  'DATASETS_DIR=/path/to/my/datasets' \
+  'BASE_COEFS_DIR=/path/to/my/coefs' \
+  'BASE_RESULTS_DIR=/path/to/my/results' \
+  'pairings=("pair")' \
+  'targets=("helix")' \
+  'timesteps=("none")' \
+| bash scripts/structures/probes/probes_sweep.sh
+
+# Only change the Python interpreter
+printf '%s\n' 'PYTHON=/path/to/env/bin/python' | bash scripts/structures/probes/probes_sweep.sh
+```
+
+Allowed override variables: `PY_SCRIPT`, `DATASETS_DIR`, `BASE_COEFS_DIR`, `BASE_RESULTS_DIR`, `PYTHON`, `pairings`, `targets`, `timesteps`.

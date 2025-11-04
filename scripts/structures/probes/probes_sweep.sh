@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="/data/wzarzecki/SAEtoRuleRFDiffusion"
-PY_SCRIPT="$PROJECT_ROOT/scripts/structures/probes/train_probes.py"
-DATASETS_DIR="/home/wzarzecki/ds_10000x_normalized/structures_ds_merged"
-BASE_COEFS_DIR="/home/wzarzecki/ds_10000x_normalized/coefs"
-BASE_RESULTS_DIR="/home/wzarzecki/ds_10000x_normalized/results/probes"
-PYTHON="/home/wzarzecki/miniforge3/envs/diffsae/bin/python"
+
+DATASETS_DIR=${1:"/home/wzarzecki/ds_10000x_block_2/structures_ds_merged"}
+BASE_COEFS_DIR=${2:-"/home/wzarzecki/ds_10000x_block_2/coefs"}
+BASE_RESULTS_DIR=${3:-"/home/wzarzecki/ds_10000x_block_2/results/probes"}
+PYTHON=${4:-"/home/wzarzecki/miniforge3/envs/diffsae/bin/python"}
+PY_SCRIPT="./scripts/structures/probes/train_probes.py"
 
 # pairings=("pair" "non_pair" "concat")
 #pairings=("loose_concat")
