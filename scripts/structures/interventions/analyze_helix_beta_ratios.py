@@ -70,6 +70,7 @@ def parse_directory_structure(base_dir, stride_dir=None):
                 
                 if not pdb_files:
                     print(f"Warning: No PDB files found in {dir_path}")
+                    results[threshold][class_name][lambda_val] = [0, 0, 0, 0]
                     continue
                 
                 # Calculate helix/beta ratios for all PDB files in this directory

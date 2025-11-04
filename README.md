@@ -85,7 +85,7 @@ run notebook `./notebooks/strucutres/coefs_visualization.ipynb` to analyze how m
 
 ### 4) causal intervention with SAE
 run shell script 
-
+#### run interventions
 ```shell
 bash sweep_structure_interventions.sh [lambda_start] [lambda_stop] [lambda_step] [threshold_start] [threshold_stop] [threshold_step] [first_classes] [input_dir] [num_designs] [seed] [indices_path_pair] [sae_non_pair] [sae_pair] [base_dir_for_config] [python] [prefix] [length] [coef_helix] [coef_beta] [coefs_output_dir]
 ```
@@ -96,4 +96,8 @@ This script performs a grid search over $\lambda$ and threshold parameters to ru
 You can split across tmux sessions running
 ```shell
 bash run_sweep_interventions.sh [seed] [lambda_start] [lambda_end] [lambda_step] [threshold_a] [threshold_b] [threshold_c] [num_designs] [classes_string]
+```
+#### eval interventions
+```shell
+bash scripts/structures/interventions/eval_pipeline.sh <structures_source_dir_from_sweep> <results_dir>
 ```
