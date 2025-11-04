@@ -78,3 +78,8 @@ for secondary structure you may use
 ```shell
 bash scripts/structures/probes/probes_sweep.sh <dataset_dir> <dir_to_store_coefs> <dir_to_store_results> <python_bin>
 ```
+
+#### choose number of coeficients via visualisation of discriminative features
+run notebook `./notebooks/strucutres/coefs_visualization.ipynb` to analyze how many discriminitive features can be found for given treshold
+
+
