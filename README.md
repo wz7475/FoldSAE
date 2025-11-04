@@ -64,7 +64,7 @@ wandb agent <sweep_id>
 bash scripts/sae/tmux_wandb_agents.sh <sweep_id_with_prefix> <cuda_idx> <num_of_agents>
 ```
 
-### 3) train probing models on latents
+### 3) find feature indicies by training probes
 train probing models and map their coefficients to feature indices -> let's learn which feature are responsible for concepts of interest
 
 #### create auxiliary dataset with latents and associated concepts
@@ -83,3 +83,17 @@ bash scripts/structures/probes/probes_sweep.sh <dataset_dir> <dir_to_store_coefs
 run notebook `./notebooks/strucutres/coefs_visualization.ipynb` to analyze how many discriminitive features can be found for given treshold
 
 
+### 4) causal intervention with SAE
+run shell script 
+
+```shell
+bash sweep_structure_interventions.sh [lambda_start] [lambda_stop] [lambda_step] [threshold_start] [threshold_stop] [threshold_step] [first_classes] [input_dir] [num_designs] [seed] [indices_path_pair] [sae_non_pair] [sae_pair] [base_dir_for_config] [python] [prefix] [length] [coef_helix] [coef_beta] [coefs_output_dir]
+```
+
+This script performs a grid search over $\lambda$ and threshold parameters to run structure interventions, generating a configurable number of protein designs for specific secondary structure classes. It utilizes pre-trained Sparse Autoencoders (SAEs) and coefficients to guide the RFDiffusion process.
+
+
+You can split across tmux sessions running
+```shell
+bash run_sweep_interventions.sh [seed] [lambda_start] [lambda_end] [lambda_step] [threshold_a] [threshold_b] [threshold_c] [num_designs] [classes_string]
+```
