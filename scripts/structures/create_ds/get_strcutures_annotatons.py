@@ -98,8 +98,9 @@ if __name__ == "__main__":
 
     disable_caching()
 
-    ds = Dataset.load_from_disk(args.input_dataset_path)
-    ds = add_secondary_struct_column(ds, args.stride_dir)
+    # ds = Dataset.load_from_disk(args.input_dataset_path)
+    # ds = add_secondary_struct_column(ds, args.stride_dir)
+    ds = Dataset.load_from_disk(args.output_dataset_path)
     ds = add_helix_and_beta_columns(ds)
 
     ds.save_to_disk(args.output_dataset_path)

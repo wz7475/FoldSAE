@@ -64,3 +64,14 @@ wandb agent <sweep_id>
 bash scripts/sae/tmux_wandb_agents.sh <sweep_id_with_prefix> <cuda_idx> <num_of_agents>
 ```
 
+### 3) train probing models on latents
+train probing models and map their coefficients to feature indices -> let's learn which feature are responsible for concepts of interest
+
+#### create auxiliary dataset with latents and associated concepts
+for secondary structure you may use this script
+```shell
+bash scripts/structures/create_ds/probes_ds_from_block_act.sh <input_dir> <block_act_dir> <log> <sae_for_pair> <sae_for_non_pair> <stride_bin> <python_bin>
+```
+
+#### train probes on it
+

@@ -5,8 +5,9 @@ import torch
 from datasets import Dataset, concatenate_datasets
 from torch.utils.data import DataLoader
 
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.sae.sae import Sae
-
 
 def process_dataset_part(dataset: Dataset, sae: Sae, device: torch.device, batch_size: int):
     """Process a part of the dataset using the specified SAE model.
