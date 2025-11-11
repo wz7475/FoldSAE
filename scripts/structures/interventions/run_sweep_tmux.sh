@@ -27,6 +27,7 @@ threshold_stop=${6:-0.1} # Corresponds to argument 5 in sweep_structure_interven
 threshold_steo=${7:-0.5} # Corresponds to argument 6 in sweep_structure_interventions.sh
 num_designs=${8:-20}  # Corresponds to argument 8 in sweep_structure_interventions.sh
 classes_string=${9:-'beta'} # Corresponds to argument 7 in sweep_structure_interventions.sh
+dir_for_generated_designs=${10:-'./temp_intervention_sweep'} # Corresponds to argument 9 in sweep_structure_interventions.sh
 
 # Session name
 SESSION_NAME="sweep_interventions"
@@ -98,13 +99,15 @@ for LAMBDA in $LAMBDAS; do
 
     # Per-lambda output dir and log file
     # Uses threshold_start and threshold_stop in the log file name for context
-    OUT_DIR="./temp_interventions_sweep/lambda_${LAMBDA}"
+    OUT_DIR="$dir_for_generated_designs/lambda_${LAMBDA}"
     LOG_FILE="$LOG_DIR/sweep_interventions_cuda${CUDA_IDX}_lm${LAMBDA}_${LAMBDA}_s${lambda_step}_thr${threshold_start}_${threshold_stop}_c${threshold_steo}_classes-${classes_string}_${TIMESTAMP}.log"
 
     # Launch command in the window
     # The LAMBDA value is used twice as arguments 1 and 2
     # The thresholds, num_designs, classes_string, and seed are now configurable
-    tmux send-keys -t "$TMUX_TARGET" "CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} ${lambda_step} ${threshold_start} ${threshold_stop} ${threshold_steo} '${classes_string}' '${OUT_DIR}' ${num_designs} ${seed} 2>&1 | tee -a ${LOG_FILE}" Enter
+    command="CUDA_VISIBLE_DEVICES=${CUDA_IDX} ./scripts/structures/interventions/sweep_structure_interventions.sh ${LAMBDA} ${LAMBDA} ${lambda_step} ${threshold_start} ${threshold_stop} ${threshold_steo} '${classes_string}' '${OUT_DIR}' ${num_designs} ${seed} 2>&1 | tee -a ${LOG_FILE}";
+    echo "createing tab $win_idx with command: $command"
+    tmux send-keys -t "$TMUX_TARGET"  "$command" Enter
 
     idx=$((idx+1))
     win_idx=$((win_idx+1))

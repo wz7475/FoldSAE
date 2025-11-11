@@ -4,8 +4,9 @@
 
 structures_source_dir=${1:-"temp_interventions_sweep"}
 target_dir_name=${2:-"pdb_and_results"}
-stride_binary=${3:-"/data/wzarzecki/SAEtoRuleRFDiffusion/stride/stride"}
-python=${4:-"/home/wzarzecki/miniforge3/envs/diffsae/bin/python"}
+summary_title=${3:-"Summary plot"}
+stride_binary=${4:-"/data/wzarzecki/SAEtoRuleRFDiffusion/stride/stride"}
+python=${5:-"/home/wzarzecki/miniforge3/envs/diffsae/bin/python"}
 
 
 
@@ -42,7 +43,7 @@ echo "Step 3: Generating plots..."
 $python scripts/structures/interventions/plot_helix_beta_ratios.py \
   --results_file "$results_file" \
   --output_dir "$plot_dir" \
-  --summary
+  --summary_title "$summary_title"
 
 
 # 4) copy pdbs

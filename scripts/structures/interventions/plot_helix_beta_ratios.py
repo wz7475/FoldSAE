@@ -9,7 +9,7 @@ import argparse
 import json
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict
+import math
 
 
 def load_results(results_file):
@@ -111,7 +111,7 @@ def create_plots(results, output_dir):
             print(f"    Saved: {filepath}")
 
 
-def create_summary_plot(results, output_dir):
+def create_summary_plot(results, output_dir, title):
     """Create a summary plot with all thresholds and classes."""
     
     print("Creating summary plot...")
@@ -122,27 +122,28 @@ def create_summary_plot(results, output_dir):
     for threshold in thresholds:
         classes.update(results[threshold].keys())
     # If a 'beta' class exists (case-insensitive), use only that single pane/column
-    beta_key = None
-    for c in sorted(classes):
-        if c.lower() == 'beta':
-            beta_key = c
-            break
-    if beta_key:
-        classes = [beta_key]
-    else:
-        classes = sorted(classes)
+    # beta_key = None
+    # for c in sorted(classes):
+    #     if c.lower() == 'beta':
+    #         beta_key = c
+    #         break
+    # if beta_key:
+    #     classes = [beta_key]
+    # else:
+    #     classes = sorted(classes)
     
     n_thresholds = len(thresholds)
     n_classes = len(classes)
     
-    fig, axes = plt.subplots(n_thresholds, n_classes, figsize=(5*n_classes, 4*n_thresholds))
-    
+    # fig, axes = plt.subplots(n_thresholds, n_classes, figsize=(5*n_classes, math.ceil(4.1*n_thresholds)))
+    fig, axes = plt.subplots(n_thresholds, n_classes,  figsize=(5*n_classes, 4*n_thresholds))
+
     # Ensure axes is a 2D array shaped (n_thresholds, n_classes)
     axes = np.array(axes)
     axes = axes.reshape(n_thresholds, n_classes)
     
     for i, threshold in enumerate(thresholds):
-        for j, class_name in enumerate(classes):
+        for j, class_name in enumerate(sorted(classes)):
             ax = axes[i, j]
             
             if class_name in results[threshold]:
@@ -150,34 +151,43 @@ def create_summary_plot(results, output_dir):
                 lambda_values = sorted(class_data.keys(), key=float)
                 
                 helix_ratios = []
+                beta_ratios = []
+                successful_designs_nums = []
                 
                 for lambda_val in lambda_values:
                     entry = class_data[lambda_val]
                     # Support both 3-value and 4-value entries
-                    if isinstance(entry, (list, tuple)):
-                        if len(entry) >= 3:
-                            helix_count, _, total_residues = entry[0], entry[1], entry[2]
-                        else:
-                            helix_count, total_residues = 0, 0
-                    else:
-                        helix_count, total_residues = 0, 0
-                    
+                    helix_count, beta_count, total_residues, pdb_count = entry[0], entry[1], entry[2], entry[3]
+
+                    #     else:
+                    #         helix_count, beta_count, total_residues = 0, 0, 0
+                    # else:
+                    #     helix_count, beta_count, total_residues = 0, 0, 0
+                    successful_designs_nums.append(pdb_count)
                     if total_residues > 0:
                         helix_ratio = helix_count / total_residues
+                        beta_ratio = beta_count / total_residues
                     else:
-                        helix_ratio = 0
+                        helix_ratio, beta_ratio= 0, 0
                     
                     helix_ratios.append(helix_ratio)
-                
+                    beta_ratios.append(beta_ratio)
+
+                successful_designs_ratio = [x / max(successful_designs_nums) for x in successful_designs_nums]
                 lambda_values_float = [float(x) for x in lambda_values]
                 
                 # Plot only helix series on summary grid
                 ax.plot(lambda_values_float, helix_ratios, 'o-', 
-                       color='red', linewidth=2, markersize=4)
+                       color='red', linewidth=2, markersize=4, label="helix count / total residues")
+                ax.plot(lambda_values_float, beta_ratios, 'o-', 
+                       color='blue', linewidth=2, markersize=4, label="beta count / total residues")
+                ax.plot(lambda_values_float, successful_designs_ratio, 'o-',
+                       color='green', linewidth=2, markersize=4, label="successful designs ratio")
+
                 # (beta series intentionally skipped)
                 
                 # Title and labels
-                ax.set_title('Ratio: alpha helices / total residues', fontsize=15)
+                ax.set_title(f'steering towards: {class_name}; thr: {threshold}', fontsize=12)
                 ax.grid(True, alpha=0.3)
                 ax.legend(fontsize=8)
                 
@@ -188,8 +198,9 @@ def create_summary_plot(results, output_dir):
             else:
                 ax.text(0.5, 0.5, 'No Data', ha='center', va='center', transform=ax.transAxes)
                 ax.set_title(f'Thr: {threshold}, Class: {class_name}', fontsize=10)
-    
-    plt.tight_layout()
+
+    fig.suptitle(title, fontsize=14)
+    # plt.tight_layout()
     summary_filepath = os.path.join(output_dir, "helix_ratios_summary.png")
     plt.savefig(summary_filepath, dpi=300, bbox_inches='tight')
     plt.close()
@@ -266,7 +277,7 @@ def main():
     parser = argparse.ArgumentParser(description='Generate plots for helix to beta sheet ratios analysis')
     parser.add_argument('--results_file', required=True, help='JSON file containing the analysis results')
     parser.add_argument('--output_dir', required=True, help='Directory to save the plots')
-    parser.add_argument('--summary', action='store_true', help='Also create a summary plot with all data')
+    parser.add_argument('--summary_title', required=True, help='Also create a summary plot with all data')
     
     args = parser.parse_args()
     
@@ -276,8 +287,7 @@ def main():
     print(f"Creating individual plots in: {args.output_dir}")
     create_plots(results, args.output_dir)
     
-    if args.summary:
-        create_summary_plot(results, args.output_dir)
+    create_summary_plot(results, args.output_dir, args.summary_title)
 
     # Always create PDB counts plot if counts are available in results
     create_pdb_counts_plot(results, args.output_dir)
