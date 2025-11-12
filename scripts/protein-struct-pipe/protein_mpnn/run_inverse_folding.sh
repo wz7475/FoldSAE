@@ -2,7 +2,7 @@
 
 pdb_dir="$1"
 output_dir="$2"
-PYTHON_EXEC=${3:-/home/wzarzecki/miniforge3/envs/uncond38/bin/python}
+PYTHON_EXEC=${3:-/home/wzarzecki/miniforge3/envs/bio_emb/bin/python}
 
 mkdir -p $output_dir ;
 
