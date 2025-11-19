@@ -4,6 +4,12 @@
 git clone --recursive git@github.com:wz7475/SAEtoRuleRFDiffusion.git
 ```
 
+enviroment
+```shell
+# we require installed conda and python 3.10 due to depencies of original RFdiffusion
+bash ./scripts/envs/rfdiffsae.sh
+```
+
 ## usage
 - each directory contains subproject
 - `scripts` contain script to run functionalities of each subproject - [check out here for more info](scripts/readme.md)
@@ -100,4 +106,8 @@ bash run_sweep_interventions.sh [seed] [lambda_start] [lambda_end] [lambda_step]
 #### eval interventions
 ```shell
 bash scripts/structures/interventions/eval_pipeline.sh <structures_source_dir_from_sweep> <results_dir>
+```
+#### validate structures
+```shell
+bash scripts/structures/validation/val_dir_of_dirs.sh <structures_source_dir_from_sweep/pdb> <val_results_dir> <n_ref>
 ```
