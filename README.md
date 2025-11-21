@@ -10,6 +10,8 @@ enviroment
 bash ./scripts/envs/rfdiffsae.sh
 ```
 
+Weights are available at this [link](https://drive.google.com/file/d/1tryqqxtXT6qlLvMOCKSfnfq_hW3y7vt-/view?usp=sharing).
+
 ## usage
 - each directory contains subproject
 - `scripts` contain script to run functionalities of each subproject - [check out here for more info](scripts/readme.md)
