@@ -24,7 +24,7 @@ We perform systematic ablation of RFdiffusion blocks to identify which block int
 
 The optimal block $m^*$ is selected by maximizing the change in property strength:
 
-$$m^* = \operatorname*{argmax}_{m} \left| S(M_{\text{orig}}) - S(M_{\setminus m}) \right|$$
+$$m^* = \text{argmax}_{m} \left| S(M_{\text{orig}}) - S(M_{\setminus m}) \right|$$
 
 where $S$ is a score function measuring the desired property and $M_{\setminus m}$ is the model with block $m$ ablated.
 
