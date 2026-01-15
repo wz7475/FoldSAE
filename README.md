@@ -1,5 +1,115 @@
-# SAEtoRuleRFDiffusion
-## setup
+# FoldSAE: Learning to Steer Protein Folding Through Sparse Representations
+
+[![arXiv](https://img.shields.io/badge/arXiv-2511.22519-B31B1B?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2511.22519)
+
+<!-- <p align="center"><a href="https://arxiv.org/abs/2511.22519" style="font-size:28px; font-weight:700; text-decoration:none;">📄 arXiv:2511.22519 — FoldSAE: Interpretable Control of Protein Structure Generation</a></p> -->
+
+**FoldSAE** applies Sparse Autoencoders (SAEs) to the internal representations of RFdiffusion to uncover secondary structure–specific features and establish precise control over protein backbone generation. This framework pioneers interpretable steering in protein structure design, demonstrating how understanding internal features can be directly translated into control over the protein design process.
+
+## Overview
+
+RFdiffusion is a powerful generative model for protein structures, but its internal representations and decision-making process remain largely opaque. We address this by:
+1. **Localizing** which RFdiffusion blocks encode information about protein secondary structures
+2. **Interpreting** block activations using Sparse Autoencoders to discover mono-semantic features
+3. **Intervening** on these features to enable precise, tunable control over helix and strand formation
+
+![SAE Intervention Mechanism](figs/sae_intervention.png)
+*Overview of the FoldSAE steering mechanism: activations are intercepted, decomposed into sparse features, modulated based on their correlation with target properties, and reintroduced to guide protein generation.*
+
+## Method
+
+### 1. Localization: Finding the Right Block
+
+We perform systematic ablation of RFdiffusion blocks to identify which block introduces secondary structure information into the residual stream. For a given block $m$, we substitute its output with the previous block's output and measure the impact on secondary structure distribution.
+
+The optimal block $m^*$ is selected by maximizing the change in property strength:
+
+$$m^* = \operatorname*{argmax}_{m} \left| S(M_{\text{orig}}) - S(M_{\setminus m}) \right|$$
+
+where $S$ is a score function measuring the desired property and $M_{\setminus m}$ is the model with block $m$ ablated.
+
+![Ablation Results](figs/ablation_results.png)
+*Localization of secondary structure encoding: ablating block `main_04` renders RFdiffusion incapable of generating helices.*
+
+### 2. Interpretation: Training Sparse Autoencoders
+
+We train a top-K SAE to decompose block activations into interpretable features. The architecture consists of:
+
+- **Encoder**: $\mathbf{z} = \text{TopK}(\text{ReLU}(\mathbf{W}_{\text{enc}}(\mathbf{x} - \mathbf{b})))$
+- **Decoder**: $\mathbf{\hat{x}} = \mathbf{W}_{\text{dec}}\mathbf{z} + \mathbf{b}$
+
+where activations of length $l \times d$ (residues × hidden dimension) are treated as $l$ patches of dimension $d$.
+
+**Training configuration:**
+- 50,000 steps, batch size 4,096
+- Learning rate: $1 \times 10^{-4}$
+- Expansion factor: 16, k=64
+- **Results**: 99.1% explained variance, minimal dead features
+
+
+#### Feature Selection via Probing
+
+To identify discriminative features, we:
+1. Generate 10,000 proteins with integrated SAE and cache encoder activations
+2. Assign secondary structures to residues using Stride
+3. Train One-vs-Rest logistic regression classifiers (helix vs. rest, strand vs. rest)
+4. Select features where coefficients exceed threshold with opposite signs between classifiers
+
+![Dataset Gathering](figs/dataset_gathering.png)
+*Probing dataset collection pipeline.*
+
+**Classifier performance** (time-agnostic):
+- Helix: 84.1% balanced accuracy, 94.1% ROC AUC
+- Strand: 83.0% balanced accuracy, 93.3% ROC AUC
+
+![Probe Coefficients](figs/probes_all_coefs.png)
+*Regression coefficients for helix (blue) and strand (orange) classifiers. The largest coefficients coincide at the same feature indices but with opposite signs, suggesting shared latent features govern structural differentiation.*
+
+### 3. Intervention: Steering Generation
+
+We modulate SAE features based on their correlation with target properties using a tunable parameter $\lambda$:
+- $\lambda = 0$: No intervention
+- $\lambda > 0$: Steer towards target property
+- $\lambda < 0$: Steer away from target property
+
+Features are scaled by:
+- $(1+\lambda)$ if positively correlated with target
+- $(1-\lambda)$ if negatively correlated
+- $1$ otherwise
+
+## Results
+
+### Precise Control Over Secondary Structure
+
+Steering intensity $\lambda$ provides fine-grained control over secondary structure distribution:
+
+![Intervention Distribution Results](figs/intervention_dist_results.png)
+*Fraction of helices (red), strands (blue), and coils (green) as a function of $\lambda$. Left: steering towards helices. Right: steering towards strands.*
+
+### Single Protein Structure Control
+
+Individual protein backbones demonstrate direct correlation between $\lambda$ and secondary structure density:
+
+![Single Protein Intervention](figs/intervention_single.png)
+*3D structures generated with $\lambda \in \{-2, -1, 0, 1, 2\}$. Negative values suppress helix formation (left), while positive values promote higher helix density (right).*
+
+### Biological Plausibility Maintained
+
+We validate that steered structures remain biologically plausible by:
+1. Converting backbones to sequences using ProteinMPNN
+2. Embedding sequences with ESM2
+3. Comparing distributions using FBD and MMD metrics
+
+**Key finding**: Non-zero $\lambda$ interventions show no significant deviation from baseline ($\lambda=0$), confirming biological validity is preserved during steering.
+
+| Target  | Metric | λ=-5   | λ=-4   | λ=-3   | λ=-2   | λ=-1   | **λ=0** | λ=1    | λ=2    | λ=3    | λ=4    | λ=5    |
+|---------|--------|--------|--------|--------|--------|--------|---------|--------|--------|--------|--------|--------|
+| helices | FBD    | 92.43  | 92.23  | 92.69  | 91.92  | 92.28  | **92.83** | 92.10  | 92.25  | 92.21  | 91.76  | 88.50  |
+|         | MMD    | 703.82 | 702.28 | 709.50 | 701.98 | 706.47 | **704.87** | 694.63 | 704.00 | 699.09 | 701.23 | 648.20 |
+| strands | FBD    | 91.95  | 91.82  | 91.79  | 92.54  | 91.74  | **92.83** | 92.50  | 93.26  | 93.08  | 92.23  | 92.66  |
+|         | MMD    | 705.63 | 702.86 | 697.06 | 698.99 | 698.87 | **704.87** | 709.27 | 711.09 | 719.05 | 707.67 | 711.83 |
+
+## Setup
 ```shell
 git clone --recursive git@github.com:wz7475/SAEtoRuleRFDiffusion.git
 ```
